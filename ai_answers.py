@@ -162,7 +162,7 @@ INTERACTIVE_CSS = '''
                             max-width: 8rem;
                             vertical-align: middle;
                         }
-                        sxng-model-select:hover {
+                        .sxng-model-select:hover {
                             background-color: #303033;
                             color: var(--color-search-url, #bbb);
                         }
