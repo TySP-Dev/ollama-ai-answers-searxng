@@ -18,26 +18,32 @@ TOKEN_EXPIRY_SEC = 3600
 STREAM_CHUNK_SIZE = 512
 STREAM_TIMEOUT_SEC = 60
 
-def _get_streaming_connection(url: str):
+def _get_streaming_connection(url: str, verify_ssl: bool = True):
     parsed = urlparse(url)
     host = parsed.hostname
     port = parsed.port or (443 if parsed.scheme == 'https' else 80)
     path = parsed.path + ('?' + parsed.query if parsed.query else '')
-    
-    verify_ssl = True
-    if get_network is not None:
+
+    if verify_ssl and get_network is not None:
         try:
             net = get_network()
             verify_ssl = getattr(net, 'verify', True)
         except Exception:
             pass
-    
+
     if parsed.scheme == 'https':
-        ctx = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
+        if not verify_ssl:
+            ctx = ssl._create_unverified_context()
+        else:
+            try:
+                import certifi
+                ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ctx = ssl.create_default_context()
         conn = http.client.HTTPSConnection(host, port, timeout=STREAM_TIMEOUT_SEC, context=ctx)
     else:
         conn = http.client.HTTPConnection(host, port, timeout=STREAM_TIMEOUT_SEC)
-    
+
     return conn, path
 
 
@@ -450,28 +456,28 @@ INTERACTIVE_JS = r'''
                             const _modelsUrl = script_root + '/ai-models?tk=' + encodeURIComponent(tk_init);
                             console.log('[AI Answers] Fetching models from', _modelsUrl);
                             fetch(_modelsUrl)
-                                .then(r => {
-                                    console.log('[AI Answers] /ai-models response status:', r.status);
-                                    return r.ok ? r.json() : Promise.reject('HTTP ' + r.status);
-                                })
+                                .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
                                 .then(d => {
-                                    console.log('[AI Answers] /ai-models payload:', d);
-                                    if (!d || !d.models || d.models.length <= 1) {
-                                        console.log('[AI Answers] Model selector hidden: need 2+ models, got', d && d.models ? d.models.length : 0);
-                                        return;
-                                    }
-                                    const _cur = _msel2.value;
+                                    const models = (d && d.models && d.models.length > 0) ? d.models : [model_init];
+                                    const _cur = _msel2.value || model_init;
                                     _msel2.innerHTML = '';
-                                    d.models.forEach(m => {
+                                    models.forEach(m => {
                                         const o = document.createElement('option');
                                         o.value = m; o.textContent = m;
-                                        if (m === (_cur || model_init)) o.selected = true;
+                                        if (m === _cur) o.selected = true;
                                         _msel2.appendChild(o);
                                     });
-                                    document.getElementById('sxng-model-select').style.display = 'inline-block';
-                                    console.log('[AI Answers] Model selector shown with', d.models.length, 'models');
+                                    _msel2.style.display = 'inline-block';
                                 })
-                                .catch(err => { console.warn('[AI Answers] /ai-models fetch failed:', err); });
+                                .catch(() => {
+                                    if (model_init) {
+                                        const o = document.createElement('option');
+                                        o.value = model_init; o.textContent = model_init;
+                                        o.selected = true;
+                                        _msel2.appendChild(o);
+                                        _msel2.style.display = 'inline-block';
+                                    }
+                                });
                         })();
 '''
 
@@ -751,7 +757,7 @@ class SXNGPlugin(Plugin):
         self.endpoint_url = raw_url
 
         self.api_key = 'ollama'
-        self.model = os.getenv('LLM_MODEL', 'llama3.2').strip()
+        self.model = os.getenv('LLM_MODEL', 'qwen3.5:9b').strip()
 
         try:
             self.max_tokens = max(1, int(os.getenv('LLM_MAX_TOKENS', 200)))
@@ -913,23 +919,42 @@ class SXNGPlugin(Plugin):
             except (ValueError, KeyError, AttributeError):
                 abort(403)
 
-            conn = None
-            try:
-                p = urlparse(self.endpoint_url)
-                tags_url = f"{p.scheme}://{p.netloc}/api/tags"
-                conn, path = _get_streaming_connection(tags_url)
-                conn.request("GET", path)
-                res = conn.getresponse()
-                body = res.read().decode('utf-8', errors='replace')
-                tags_data = json.loads(body)
-                models = [m['name'] for m in tags_data.get('models', [])]
-                return jsonify({'models': models})
-            except Exception as e:
-                logger.error(f"{PLUGIN_NAME}: /ai-models error: {e}", exc_info=True)
-                return jsonify({'models': [self.model] if self.model else []})
-            finally:
-                if conn:
-                    conn.close()
+            auth_headers = {"Authorization": f"Bearer {self.api_key}"}
+            p = urlparse(self.endpoint_url)
+            base = f"{p.scheme}://{p.netloc}"
+
+            def fetch_get(start_url):
+                url = start_url
+                for _ in range(5):
+                    conn, path = _get_streaming_connection(url)
+                    conn.request("GET", path, headers=auth_headers)
+                    res = conn.getresponse()
+                    if res.status in (301, 302, 307, 308):
+                        location = res.getheader('Location', '')
+                        res.read(); conn.close()
+                        if not location:
+                            return None
+                        url = location if location.startswith('http') else f"{urlparse(url).scheme}://{urlparse(url).netloc}{location}"
+                        continue
+                    return res
+                return None
+
+            for models_url, parse_fn in [
+                (f"{base}/v1/models", lambda d: [m['id'] for m in d.get('data', [])]),
+                (f"{base}/api/tags",  lambda d: [m['name'] for m in d.get('models', [])]),
+            ]:
+                try:
+                    res = fetch_get(models_url)
+                    if res and res.status == 200:
+                        models = parse_fn(json.loads(res.read().decode('utf-8', errors='replace')))
+                        if models:
+                            return jsonify({'models': models})
+                    elif res:
+                        res.read()
+                except Exception as e:
+                    logger.debug(f"{PLUGIN_NAME}: /ai-models attempt {models_url} failed: {e}")
+
+            return jsonify({'models': [self.model] if self.model else []})
 
         @app.route('/ai-stream', methods=['POST'])
         def handle_ai_stream():
@@ -1020,7 +1045,6 @@ class SXNGPlugin(Plugin):
             def call_ollama():
                 conn = None
                 try:
-                    conn, path = _get_streaming_connection(self.endpoint_url)
                     payload_dict = {
                         "model": effective_model,
                         "messages": [
@@ -1037,8 +1061,23 @@ class SXNGPlugin(Plugin):
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.api_key}",
                     }
-                    conn.request("POST", path, body=payload.encode('utf-8'), headers=headers)
-                    res = conn.getresponse()
+                    url = self.endpoint_url
+                    res = None  # type: ignore[assignment]
+                    for _ in range(3):
+                        conn, path = _get_streaming_connection(url)
+                        conn.request("POST", path, body=payload.encode('utf-8'), headers=headers)
+                        res = conn.getresponse()
+                        if res.status in (301, 302, 307, 308):
+                            location = res.getheader('Location', '')
+                            res.read()
+                            conn.close()
+                            conn = None
+                            if not location:
+                                return '', f"Redirect {res.status} with no Location header"
+                            url = location if location.startswith('http') else f"{urlparse(url).scheme}://{urlparse(url).netloc}{location}"
+                            logger.info(f"{PLUGIN_NAME}: Following redirect to {url}")
+                            continue
+                        break
                     if res.status != 200:
                         body = res.read(1024).decode('utf-8', errors='replace')
                         logger.error(f"{PLUGIN_NAME}: Ollama {res.status}: {body}")
