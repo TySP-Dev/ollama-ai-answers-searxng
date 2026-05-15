@@ -67,7 +67,7 @@ INTERACTIVE_CSS = '''
                             display: flex;
                             align-items: center;
                             gap: 0.5rem;
-                            margin-top: 0.5rem;
+                            margin-top: 1rem;
                             opacity: 0;
                             animation: sxng-fade-in-up 0.5s ease-out forwards;
                         }
@@ -1369,7 +1369,7 @@ class SXNGPlugin(Plugin):
                 .replace("__JS_Q__", js_q)
 
             html_payload = f'''
-                <article id="sxng-stream-box" class="answer" style="display:none; margin: 1rem 0;">
+                <article id="sxng-stream-box" class="answer" style="display:none; margin-top: 0; margin-bottom: 0;">
                     <style>
                         @keyframes sxng-fade-pulse {{
                             0%, 100% {{ opacity: 0.1; }}
@@ -1381,7 +1381,7 @@ class SXNGPlugin(Plugin):
                         }}
                         #sxng-stream-data {{
                             position: relative;
-                            margin: 0;
+                            margin-top: 1rem !important;
                             min-height: 1.5em;
                         }}
                         .sxng-cursor {{
