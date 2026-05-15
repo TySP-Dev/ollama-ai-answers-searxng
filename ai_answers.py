@@ -1171,10 +1171,20 @@ class SXNGPlugin(Plugin):
                     if not choices:
                         return '', "No choices in API response."
                     message = choices[0].get("message", {})
-                    content = message.get("content") or ""
-                    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                    content = re.sub(r'<think>.*?</think>', '', message.get("content") or "", flags=re.DOTALL).strip()
                     reasoning = message.get("reasoning") or message.get("reasoning_content") or ""
-                    full = (f"<think>\n{reasoning}\n</think>\n\n" if reasoning else "") + content
+                    if not content and reasoning:
+                        # Model put the answer in the reasoning field (qwen3 think:False behaviour).
+                        # Extract the final answer: take everything after the last numbered/bulleted
+                        # step line, or fall back to the last two non-empty paragraphs.
+                        answer = re.split(r'\n(?:\d+[.)]\s|\*\s)', reasoning)[-1].strip()
+                        if not answer:
+                            paras = [p.strip() for p in re.split(r'\n{2,}', reasoning) if p.strip()]
+                            answer = '\n\n'.join(paras[-2:]) if len(paras) >= 2 else reasoning.strip()
+                        full = answer
+                    else:
+                        full = (f"<think>\n{reasoning}\n</think>\n\n" if reasoning else "") + content
+                    full = re.sub(r'<think>.*?</think>', '', full, flags=re.DOTALL).strip()
                     return full, None
                 except Exception as e:
                     logger.error(f"{PLUGIN_NAME}: {self.provider} call error: {e}", exc_info=True)
