@@ -94,12 +94,14 @@ INTERACTIVE_CSS = '''
                         .sxng-input-wrapper {
                             flex-grow: 1;
                             display: flex;
+                            height: 32px;
                             align-items: center;
                             margin: 0 0.5rem;
                             position: relative;
                         }
                         .sxng-input {
                             width: 100%;
+                            height: -webkit-fill-available;
                             background: var(--color-sidebar-bg, #424247);
                             border: none;
                             color: var(--color-base-font, #cdd6f4);
@@ -154,11 +156,12 @@ INTERACTIVE_CSS = '''
                             max-width: 160px;
                             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 6l5-6 5 6z' fill='%234a9eff'/%3E%3C/svg%3E");
                             background-repeat: no-repeat;
-                            background-position: right 6px center;
-                            background-size: 8px 5px;
+                            background-position: right;
+                            background-size: 10%;
                             display: none;
                             vertical-align: middle;
                             line-height: 1.4;
+                            margin-right: 0px !important;
                         }
                         .sxng-model-select:hover {
                             background: var(--color-search-url, #303033);
