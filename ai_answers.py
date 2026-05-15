@@ -814,10 +814,10 @@ class SXNGPlugin(Plugin):
         self.model = os.getenv('LLM_MODEL', preset['model']).strip()
 
         try:
-            self.max_tokens = max(1, int(os.getenv('LLM_MAX_TOKENS', 500)))
+            self.max_tokens = max(1, int(os.getenv('LLM_MAX_TOKENS', 200)))
         except ValueError:
-            logger.warning(f"{PLUGIN_NAME}: Invalid LLM_MAX_TOKENS value. Enforcing default (500).")
-            self.max_tokens = 500
+            logger.warning(f"{PLUGIN_NAME}: Invalid LLM_MAX_TOKENS value. Enforcing default (200).")
+            self.max_tokens = 200
         try:
             self.temperature = float(os.getenv('LLM_TEMPERATURE', 0.2))
         except ValueError:
@@ -1049,14 +1049,16 @@ class SXNGPlugin(Plugin):
                 return Response("Missing API key or query", status=400)
             
             today = time.strftime("%Y-%m-%d")
-            target_words = int(self.max_tokens * 0.75 * 0.70)
             lang_instruction = f" Respond in {lang}." if lang not in ('all', 'auto') else ""
 
             base_sys = self.system_prompt if self.system_prompt else "You are a direct, citation-accurate search synthesis engine."
             SYSTEM = (f"{base_sys} Today is {today}.{lang_instruction} "
                       "Output only your final answer. Do not output your thinking process, "
                       "reasoning steps, or internal monologue. Begin your response with the "
-                      "direct answer immediately.")
+                      "direct answer immediately. "
+                      "Be concise. Give a 2-4 sentence overview that directly answers the query. "
+                      "The user can ask follow-up questions for more detail. "
+                      "Do not enumerate or list everything from the sources.")
             max_source_idx = 0
             if context_text:
                 indices = re.findall(r'\[(\d+)\]', context_text)
@@ -1066,10 +1068,10 @@ class SXNGPlugin(Plugin):
             CORE_RULES = [
                 "Answer the question directly using the provided context.",
                 "MUST CITE SOURCES by tailing a sentence with [n] or [n,n] etc. If citing general knowledge, use [*].",
-                "Do not use filler words, transitions, or meta-commentary.",
                 "Never explain your process. The user expects a direct response.",
-                "Response format must be plain text with no markdown."
-                f"High density: Expert-briefing level. Target response length: ~{target_words} words.",
+                "Response format must be plain text with no markdown. "
+                "Be brief: 2-4 sentences maximum. Lead with the direct answer. "
+                "Cite the most relevant source(s) only. Stop after the overview.",
                 "If sources and general knowledge are insufficient, respond with 'Insufficient information to answer.'"
             ]
 
@@ -1328,10 +1330,19 @@ class SXNGPlugin(Plugin):
                     "                            const _msel2 = document.getElementById('sxng-model-select');\n"
                     "                            if (_msel2 && !_msel2.dataset.loaded) {\n"
                     "                                _msel2.dataset.loaded = '1';\n"
-                    "                                fetch(script_root + '/ai-models?tk=' + encodeURIComponent(tk_init))\n"
-                    "                                    .then(r => r.ok ? r.json() : null)\n"
+                    "                                const _modelsUrl = script_root + '/ai-models?tk=' + encodeURIComponent(tk_init);\n"
+                    "                                console.log('[AI Answers] Fetching models from', _modelsUrl);\n"
+                    "                                fetch(_modelsUrl)\n"
+                    "                                    .then(r => {\n"
+                    "                                        console.log('[AI Answers] /ai-models response status:', r.status);\n"
+                    "                                        return r.ok ? r.json() : Promise.reject('HTTP ' + r.status);\n"
+                    "                                    })\n"
                     "                                    .then(d => {\n"
-                    "                                        if (!d || !d.models || !d.models.length) return;\n"
+                    "                                        console.log('[AI Answers] /ai-models payload:', d);\n"
+                    "                                        if (!d || !d.models || d.models.length <= 1) {\n"
+                    "                                            console.log('[AI Answers] Model selector hidden: need 2+ models, got', d && d.models ? d.models.length : 0);\n"
+                    "                                            return;\n"
+                    "                                        }\n"
                     "                                        const _cur = _msel2.value;\n"
                     "                                        _msel2.innerHTML = '';\n"
                     "                                        d.models.forEach(m => {\n"
@@ -1340,9 +1351,10 @@ class SXNGPlugin(Plugin):
                     "                                            if (m === (_cur || model_init)) o.selected = true;\n"
                     "                                            _msel2.appendChild(o);\n"
                     "                                        });\n"
-                    "                                        _msel2.style.display = '';\n"
+                    "                                        _msel2.style.display = 'inline-block';\n"
+                    "                                        console.log('[AI Answers] Model selector shown with', d.models.length, 'models');\n"
                     "                                    })\n"
-                    "                                    .catch(() => {});\n"
+                    "                                    .catch(err => { console.warn('[AI Answers] /ai-models fetch failed:', err); });\n"
                     "                            }"
                 )
             else:
