@@ -153,11 +153,11 @@ INTERACTIVE_CSS = '''
                             font-size: 0.78em;
                             cursor: pointer;
                             width: auto;
-                            max-width: 160px;
+                            max-width: 6rem;
                             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 6l5-6 5 6z' fill='%234a9eff'/%3E%3C/svg%3E");
                             background-repeat: no-repeat;
                             background-position: right;
-                            background-size: 10%;
+                            background-size: 15%;
                             display: none;
                             vertical-align: middle;
                             line-height: 1.4;
@@ -187,7 +187,6 @@ INTERACTIVE_HTML = '''
                         <button class="sxng-btn" id="btn-regen" title="Regenerate answer">
                             <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z"/></svg>
                         </button>
-                        <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
                         <form id="sxng-action-form" class="sxng-input-wrapper" onsubmit="event.preventDefault();">
                             <input type="text" id="sxng-action-input" class="sxng-input" placeholder="Ask..." aria-label="Ask follow-up" autocomplete="off">
                             <div class="sxng-input-line"></div>
@@ -1402,18 +1401,28 @@ class SXNGPlugin(Plugin):
                                 animation: sxng-fade-in 0.3s ease-out;
                             }}
                         }}
+                        .sxng-ai-header {{
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 4px;
+                            margin-top: -4px;
+                        }}
                         .sxng-ai-label {{
                             font-size: 1.05em;
                             font-weight: 700;
-                            margin-bottom: 4px;
-                            margin-top: -4px;
                             letter-spacing: 0.04em;
                             text-transform: none;
                             color: var(--color-base-font, #333);
                         }}
                         {interactive_css}
                     </style>
-                    <span style="color:#4a9eff;font-size:1.1em;">✦</span> AI Overview
+                    <div class="sxng-ai-header">
+                        <span class="sxng-ai-label">
+                            <span style="color:#4a9eff;font-size:1.1em;">✦</span> AI Overview
+                        </span>
+                        <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
+                    </div>
                     <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
                     <script>
