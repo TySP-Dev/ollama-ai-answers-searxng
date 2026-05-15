@@ -5,7 +5,7 @@ try:
     from searx.network import get_network
 except ImportError:
     get_network = None
-from flask import Response, request, abort, jsonify
+from flask import Response, request, abort, jsonify, stream_with_context
 from searx.plugins import Plugin, PluginInfo
 from searx.result_types import EngineResults
 from searx import settings
@@ -164,6 +164,20 @@ INTERACTIVE_CSS = '''
                         }
                         .sxng-input-submit svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-input-submit svg { width: 18px; height: 18px; fill: currentColor; }
+                        .sxng-model-select {
+                            background: var(--color-sidebar-bg, var(--color-base-background, #f8f8f8));
+                            color: var(--color-base-font, #333);
+                            border: 1px solid var(--color-search-url, rgba(0,0,0,0.15));
+                            border-radius: 6px;
+                            padding: 0.15rem 0.4rem;
+                            font-size: 0.8rem;
+                            cursor: pointer;
+                            opacity: 0.7;
+                            transition: opacity 0.2s;
+                            max-width: 160px;
+                            display: none;
+                        }
+                        .sxng-model-select:hover { opacity: 1; }
                         .sxng-reasoning {
                             margin: 0.5rem 0; padding: 0.5rem;
                             border-left: 2px solid var(--color-result-link, #5e81ac);
@@ -183,6 +197,7 @@ INTERACTIVE_HTML = '''
                         <button class="sxng-btn" id="btn-regen" title="Regenerate answer">
                             <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z"/></svg>
                         </button>
+                        <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
                         <form id="sxng-action-form" class="sxng-input-wrapper" onsubmit="event.preventDefault();">
                             <input type="text" id="sxng-action-input" class="sxng-input" placeholder="Ask..." aria-label="Ask follow-up" autocomplete="off">
                             <div class="sxng-input-line"></div>
@@ -249,6 +264,16 @@ CITATION_HELPER_JS = r'''
 INTERACTIVE_JS = r'''
                         const footer = document.getElementById('sxng-footer');
                         const input = document.getElementById('sxng-action-input');
+                        if (typeof model_init !== 'undefined' && model_init) {
+                            const _ms = document.getElementById('sxng-model-select');
+                            if (_ms) {
+                                const _o = document.createElement('option');
+                                _o.value = model_init;
+                                _o.textContent = model_init;
+                                _o.selected = true;
+                                _ms.appendChild(_o);
+                            }
+                        }
                         if (window.getComputedStyle && box) {
                             try {
                                 const docStyles = getComputedStyle(document.documentElement);
@@ -454,6 +479,7 @@ FRONTEND_JS_TEMPLATE = r"""
     const b64_init = __B64_CONTEXT__;
     const tk_init = __TK__;
     const script_root = __SCRIPT_ROOT__;
+    const model_init = __MODEL_INIT__;
     const conversation = {
         originalQuery: q_init,
         originalContext: new TextDecoder().decode(Uint8Array.from(atob(b64_init), c => c.charCodeAt(0))),
@@ -493,7 +519,8 @@ FRONTEND_JS_TEMPLATE = r"""
             let timeoutId = setTimeout(() => controller.abort(), 60000);
             const finalQ = __STREAM_Q__;
             
-            const bodyObj = { q: finalQ, lang: lang_init, context: ctx, tk: tk_init__STREAM_BODY__ };
+            const _selMdl = (document.getElementById('sxng-model-select') || {value: ''}).value;
+            const bodyObj = { q: finalQ, lang: lang_init, context: ctx, tk: tk_init, model: _selMdl__STREAM_BODY__ };
             const res = await fetch(script_root + '/ai-stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -961,6 +988,11 @@ class SXNGPlugin(Plugin):
                     abort(403)
             except (ValueError, KeyError, AttributeError):
                 abort(403)
+
+            aux_ip = request.headers.get('X-Real-IP') or request.headers.get('X-Forwarded-For')
+            if aux_ip:
+                logger.debug(f"{PLUGIN_NAME}: /ai-auxiliary-search from proxied IP {aux_ip}")
+
             query = data.get('query', '').strip()
             lang = data.get('lang', 'all')
             categories = data.get('categories', 'general')
@@ -1013,6 +1045,43 @@ class SXNGPlugin(Plugin):
                 logger.error(f"{PLUGIN_NAME}: Aux search failed: {e}")
                 return jsonify({'results': [], 'error': 'Search failed'}), 500
 
+        @app.route('/ai-models', methods=['GET'])
+        def ai_models():
+            token = request.args.get('tk', '')
+
+            models_ip = request.headers.get('X-Real-IP') or request.headers.get('X-Forwarded-For')
+            if models_ip:
+                logger.debug(f"{PLUGIN_NAME}: /ai-models from proxied IP {models_ip}")
+
+            try:
+                ts, sig = token.rsplit('.', 1)
+                expected = hashlib.sha256(f"{ts}{self.secret}".encode()).hexdigest()
+                if sig != expected or (time.time() - float(ts)) > TOKEN_EXPIRY_SEC:
+                    abort(403)
+            except (ValueError, KeyError, AttributeError):
+                abort(403)
+
+            if self.provider != 'ollama':
+                return jsonify({'models': [self.model] if self.model else []})
+
+            conn = None
+            try:
+                p = urlparse(self.endpoint_url)
+                tags_url = f"{p.scheme}://{p.netloc}/api/tags"
+                conn, path = _get_streaming_connection(tags_url)
+                conn.request("GET", path)
+                res = conn.getresponse()
+                body = res.read().decode('utf-8', errors='replace')
+                tags_data = json.loads(body)
+                models = [m['name'] for m in tags_data.get('models', [])]
+                return jsonify({'models': models})
+            except Exception as e:
+                logger.error(f"{PLUGIN_NAME}: /ai-models error: {e}", exc_info=True)
+                return jsonify({'models': [self.model] if self.model else []})
+            finally:
+                if conn:
+                    conn.close()
+
         @app.route('/ai-stream', methods=['POST'])
         def handle_ai_stream():
             data = request.json or {}
@@ -1031,7 +1100,13 @@ class SXNGPlugin(Plugin):
 
             context_text = data.get('context', '')
             prev_answer = (data.get('prev_answer') or '')[-4000:]
-            
+            req_model = (data.get('model') or '').strip()
+            effective_model = req_model or self.model
+
+            client_ip = request.headers.get('X-Real-IP') or request.headers.get('X-Forwarded-For')
+            if client_ip:
+                logger.debug(f"{PLUGIN_NAME}: /ai-stream from proxied IP {client_ip}")
+
             if not self.api_key:
                 return Response("Missing API key or query", status=400)
             
@@ -1089,6 +1164,7 @@ class SXNGPlugin(Plugin):
 </CORE_DIRECTIVES>"""
 
             def stream_gemini():
+                yield "​"
                 if '?' in self.endpoint_url:
                     url = f"{self.endpoint_url}&key={self.api_key}"
                 else:
@@ -1170,22 +1246,26 @@ class SXNGPlugin(Plugin):
                                 logger.debug(f"{PLUGIN_NAME}: Ignored malformed Gemini chunk. Error: {parse_err}")
                                 break
                 except Exception as e:
-                    logger.error(f"{PLUGIN_NAME}: Gemini stream error: {e}")
+                    logger.error(f"{PLUGIN_NAME}: Gemini stream error: {e}", exc_info=True)
                     yield f"\n⚠️ Connection Error: {e}\n"
                 finally:
                     if conn: conn.close()
 
             def stream_openai_compatible():
+                yield "​"
                 conn = None
                 try:
                     conn, path = _get_streaming_connection(self.endpoint_url)
-                    payload = json.dumps({
-                        "model": self.model,
+                    payload_dict = {
+                        "model": effective_model,
                         "messages": [{"role": "user", "content": prompt}],
                         "stream": True,
                         "max_tokens": self.max_tokens,
                         "temperature": self.temperature
-                    })
+                    }
+                    if self.provider == 'ollama':
+                        payload_dict["think"] = False
+                    payload = json.dumps(payload_dict)
                     headers = {
                         "Content-Type": "application/json",
                         "Accept": "text/event-stream",
@@ -1268,7 +1348,7 @@ class SXNGPlugin(Plugin):
                     if in_reasoning_block:
                         yield "\n</think>\n\n"
                 except Exception as e:
-                    logger.error(f"{PLUGIN_NAME}: {self.provider} stream error: {e}")
+                    logger.error(f"{PLUGIN_NAME}: {self.provider} stream error: {e}", exc_info=True)
                     yield f"\n⚠️ Connection Error: {e}\n"
                 finally:
                     if conn: conn.close()
@@ -1288,7 +1368,7 @@ class SXNGPlugin(Plugin):
                     finally:
 
                         self._ollama_unload_model()
-            return Response(generator(), mimetype='text/event-stream', headers={
+            return Response(stream_with_context(generator()), mimetype='text/event-stream', headers={
                 'X-Accel-Buffering': 'no',
                 'Cache-Control': 'no-cache, no-store',
                 'Connection': 'keep-alive'
@@ -1400,14 +1480,39 @@ class SXNGPlugin(Plugin):
             js_b64_context = safe_json(b64_context)
             js_tk = safe_json(tk)
             js_script_root = safe_json((request.script_root if request else '').rstrip('/'))
+            js_model_init = safe_json(self.model)
 
             is_interactive = self.interactive
-            
+
             interactive_css = INTERACTIVE_CSS if is_interactive else ''
             interactive_html = INTERACTIVE_HTML if is_interactive else ''
             interactive_js_init = INTERACTIVE_JS if is_interactive else ''
 
-            interactive_js_complete = "footer.style.display = 'flex';" if is_interactive else ''
+            if is_interactive:
+                interactive_js_complete = (
+                    "footer.style.display = 'flex';\n"
+                    "                            const _msel2 = document.getElementById('sxng-model-select');\n"
+                    "                            if (_msel2 && !_msel2.dataset.loaded) {\n"
+                    "                                _msel2.dataset.loaded = '1';\n"
+                    "                                fetch(script_root + '/ai-models?tk=' + encodeURIComponent(tk_init))\n"
+                    "                                    .then(r => r.ok ? r.json() : null)\n"
+                    "                                    .then(d => {\n"
+                    "                                        if (!d || !d.models || !d.models.length) return;\n"
+                    "                                        const _cur = _msel2.value;\n"
+                    "                                        _msel2.innerHTML = '';\n"
+                    "                                        d.models.forEach(m => {\n"
+                    "                                            const o = document.createElement('option');\n"
+                    "                                            o.value = m; o.textContent = m;\n"
+                    "                                            if (m === (_cur || model_init)) o.selected = true;\n"
+                    "                                            _msel2.appendChild(o);\n"
+                    "                                        });\n"
+                    "                                        _msel2.style.display = '';\n"
+                    "                                    })\n"
+                    "                                    .catch(() => {});\n"
+                    "                            }"
+                )
+            else:
+                interactive_js_complete = ''
             stream_fn_sig = 'async function startStream(overrideQ = null, prevAnswer = null, auxContext = null)'
             stream_q = 'overrideQ || q_init' if is_interactive else 'q_init'
             stream_body = f'''prev_answer: prevAnswer''' if is_interactive else ''
@@ -1416,6 +1521,7 @@ class SXNGPlugin(Plugin):
                 .replace("__IS_INTERACTIVE__", 'true' if is_interactive else 'false') \
                 .replace("__TK__", js_tk) \
                 .replace("__SCRIPT_ROOT__", js_script_root) \
+                .replace("__MODEL_INIT__", js_model_init) \
                 .replace("__CITATION_HELPER_JS__", CITATION_HELPER_JS) \
                 .replace("__INTERACTIVE_JS_INIT__", interactive_js_init) \
                 .replace("__STREAM_FN_SIG__", stream_fn_sig) \
