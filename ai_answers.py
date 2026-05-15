@@ -142,40 +142,25 @@ INTERACTIVE_CSS = '''
                             color: var(--color-result-link, #5e81ac); 
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
-                        .sxng-model-wrap {
-                            display: none;
-                            position: relative;
-                            align-items: stretch;
-                            border: 1px solid var(--color-search-url, #4a9eff);
-                            border-radius: 4px;
-                            overflow: hidden;
-                        }
-                        .sxng-model-wrap.visible {
-                            display: inline-flex;
-                        }
                         .sxng-model-select {
                             appearance: none;
                             -webkit-appearance: none;
-                            background: var(--color-sidebar-bg, #424247);
-                            color: var(--color-base-font, #cdd6f4);
-                            border: none;
-                            border-right: 1px solid var(--color-search-url, #4a9eff);
-                            padding: 3px 8px;
-                            font-size: 0.78em;
-                            line-height: 1.4;
-                            vertical-align: middle;
+                            background: url("data:image/svg+xml;charset=UTF-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%3Cg%20fill%3D%22%23aaa%22%3E%0A%3Cpolygon%20points%3D%22128%2C192%20256%2C320%20384%2C192%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E") calc(100% + 2rem) 0 / 2rem no-repeat content-box border-box;
+                            background-color: var(--color-toolkit-select-background, #313338);
+                            text-overflow: ellipsis;
+                            border-width: 0 2rem 0 0;
+                            border-color: transparent;
+                            border-radius: 5px;
+                            outline: none;
+                            height: 2.4rem;
+                            color: var(--color-search-font, #fff);
+                            font-size: .9rem;
+                            padding: .2rem;
+                            margin: 0;
                             cursor: pointer;
-                            max-width: 140px;
-                        }
-                        .sxng-model-arrow {
-                            background: var(--color-sidebar-bg, #424247);
-                            color: var(--color-search-url, #4a9eff);
-                            padding: 0 6px;
-                            font-size: 0.85em;
-                            display: flex;
-                            align-items: center;
-                            pointer-events: none;
-                            user-select: none;
+                            display: none;
+                            max-width: 160px;
+                            vertical-align: middle;
                         }
                         .sxng-reasoning {
                             margin: 0.5rem 0; padding: 0.5rem;
@@ -1348,7 +1333,7 @@ class SXNGPlugin(Plugin):
                     "                                            if (m === (_cur || model_init)) o.selected = true;\n"
                     "                                            _msel2.appendChild(o);\n"
                     "                                        });\n"
-                    "                                        document.querySelector('.sxng-model-wrap').classList.add('visible');\n"
+                    "                                        document.getElementById('sxng-model-select').style.display = 'inline-block';\n"
                     "                                        console.log('[AI Answers] Model selector shown with', d.models.length, 'models');\n"
                     "                                    })\n"
                     "                                    .catch(err => { console.warn('[AI Answers] /ai-models fetch failed:', err); });\n"
@@ -1430,10 +1415,7 @@ class SXNGPlugin(Plugin):
                         <span class="sxng-ai-label">
                             <span style="color:#4a9eff;font-size:1.1em;">✦</span> AI Overview
                         </span>
-                        <div class="sxng-model-wrap">
-                            <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
-                            <span class="sxng-model-arrow">&#8963;</span>
-                        </div>
+                        <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
                     </div>
                     <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
