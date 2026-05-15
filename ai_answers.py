@@ -152,7 +152,7 @@ INTERACTIVE_CSS = '''
                             border-color: transparent;
                             border-radius: 5px;
                             outline: none;
-                            height: 2.4rem;
+                            height: 32px;
                             color: var(--color-search-url, #bbb);
                             font-size: .9rem;
                             padding: 1px 10px 1px 10px !important;
@@ -1315,7 +1315,6 @@ class SXNGPlugin(Plugin):
                     "footer.style.display = 'flex';\n"
                     "                            const _msel2 = document.getElementById('sxng-model-select');\n"
                     "                            if (_msel2 && !_msel2.dataset.loaded) {\n"
-                    "                                _msel2.dataset.loaded = '1';\n"
                     "                                const _modelsUrl = script_root + '/ai-models?tk=' + encodeURIComponent(tk_init);\n"
                     "                                console.log('[AI Answers] Fetching models from', _modelsUrl);\n"
                     "                                fetch(_modelsUrl)\n"
