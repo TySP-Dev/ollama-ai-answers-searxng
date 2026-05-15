@@ -149,7 +149,7 @@ INTERACTIVE_CSS = '''
                             color: var(--color-search-url, #bbb);
                             border: none;
                             border-radius: 4px;
-                            padding: 3px 24px 3px 8px;
+                            padding: 1px 10px 1px 10px;
                             font-size: 0.78em;
                             cursor: pointer;
                             width: auto;
@@ -162,6 +162,7 @@ INTERACTIVE_CSS = '''
                             vertical-align: middle;
                             line-height: 1.4;
                             margin-right: 0px !important;
+                            height: 32px !important;
                         }
                         .sxng-model-select:hover {
                             background: var(--color-search-url, #303033);
