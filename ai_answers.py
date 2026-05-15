@@ -1413,8 +1413,18 @@ class SXNGPlugin(Plugin):
                                 animation: sxng-fade-in 0.3s ease-out;
                             }}
                         }}
+                        .sxng-ai-label {{
+                            font-size: 0.72rem;
+                            font-weight: 600;
+                            letter-spacing: 0.05em;
+                            text-transform: uppercase;
+                            opacity: 0.6;
+                            margin-bottom: 0.35rem;
+                            color: var(--color-base-font, #333);
+                        }}
                         {interactive_css}
                     </style>
+                    <div class="sxng-ai-label"><span style="color:#4a9eff;">✨</span> AI Overview</div>
                     <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
                     <script>
