@@ -24,11 +24,11 @@ Features:
 
 ## Installation
 
-Place `ai_answers.py` into the `searx/plugins` directory of your SearXNG instance (or mount it in a container) and enable it in `settings.yml`:
+Place `ollama_answers.py` into the `searx/plugins` directory of your SearXNG instance (or mount it in a container) and enable it in `settings.yml`:
 
 ```yaml
 plugins:
-  searx.plugins.ai_answers.SXNGPlugin:
+  searx.plugins.ollama_answers.SXNGPlugin:
     active: true
 ```
 
@@ -75,7 +75,7 @@ services:
       - LLM_URL=http://ollama:11434/v1/chat/completions
       - LLM_MODEL=qwen3.5:9b
     volumes:
-      - ./ai_answers.py:/usr/local/searxng/searx/plugins/ai_answers.py
+      - ./ollama_answers.py:/usr/local/searxng/searx/plugins/ollama_answers.py
 
   ollama:
     image: ollama/ollama
@@ -96,9 +96,9 @@ environment:
   - LLM_API_KEY=your-bearer-token
 ```
 
-## Development — Demo Server
+## Development — Dev Server
 
-A standalone Flask demo server is included in `tests/demo.py`. It mocks the SearXNG plugin environment so you can test the full UI without a running SearXNG instance.
+A standalone Flask dev server is included in `tests/dev.py`. It mocks the SearXNG plugin environment so you can test the full UI without a running SearXNG instance.
 
 ### Setup
 
@@ -109,7 +109,7 @@ pip install flask flask-babel certifi
 ### Run
 
 ```bash
-python tests/demo.py
+python tests/dev.py
 ```
 
 Then open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your browser.
@@ -122,14 +122,14 @@ Then open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your browser.
 - Expand **Ollama Configuration** at the top to change the endpoint URL or Bearer token for the current session. Click **Apply** to save and re-run the current query.
 - The model selector in the AI overview widget (loaded from `/ai-models`) shows all models available on the configured Ollama server and persists your choice in the session URL.
 
-### Environment Variables (demo)
+### Environment Variables (dev)
 
-The demo reads the same variables as the plugin:
+The dev reads the same variables as the plugin:
 
 ```bash
 LLM_URL=http://localhost:11434/v1/chat/completions \
 LLM_MODEL=qwen3.5:9b \
-python tests/demo.py
+python tests/dev.py
 ```
 
 Or export them before running. Any values set in the config panel at runtime take priority for that session.
