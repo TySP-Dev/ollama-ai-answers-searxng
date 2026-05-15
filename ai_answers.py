@@ -144,7 +144,6 @@ INTERACTIVE_CSS = '''
                         }
                         .sxng-model-select {
                             appearance: none;
-                            -webkit-appearance: none;
                             background-color: var(--color-sidebar-bg, #424247);
                             color: var(--color-search-url, #bbb);
                             border: none;
@@ -152,16 +151,14 @@ INTERACTIVE_CSS = '''
                             padding: 1px 10px 1px 10px;
                             font-size: 0.78em;
                             cursor: pointer;
-                            width: auto;
                             max-width: 6rem;
-                            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 6l5-6 5 6z' fill='%234a9eff'/%3E%3C/svg%3E");
                             background-repeat: no-repeat;
                             background-position: right;
                             background-size: 15%;
-                            display: none;
                             vertical-align: middle;
                             line-height: 1.4;
-                            margin-right: 0px !important;
+                            margin: 0 0.5rem !important;
+                            overflow: hidden;
                             height: 32px !important;
                         }
                         .sxng-model-select:hover {
