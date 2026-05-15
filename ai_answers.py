@@ -78,15 +78,15 @@ INTERACTIVE_CSS = '''
                             width: 32px;
                             height: 32px;
                             padding: 0;
-                            border: 1px solid var(--color-search-url, #4a9eff);
+                            border: none;
                             border-radius: 4px;
-                            background: var(--color-sidebar-bg, #1e1e2e);
-                            color: var(--color-search-url, #4a9eff);
+                            background: var(--color-sidebar-bg, #424247);
+                            color: var(--color-search-url, #bbb);
                             cursor: pointer;
                         }
                         .sxng-btn:hover {
-                            background: var(--color-search-url, #4a9eff);
-                            color: var(--color-sidebar-bg, #1e1e2e);
+                            background: var(--color-search-url, #303033);
+                            color: var(--color-sidebar-bg, #bbb);
                         }
                         .sxng-btn svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-input-wrapper {
@@ -98,8 +98,8 @@ INTERACTIVE_CSS = '''
                         }
                         .sxng-input {
                             width: 100%;
-                            background: var(--color-sidebar-bg, #1e1e2e);
-                            border: 1px solid var(--color-search-url, #4a9eff);
+                            background: var(--color-sidebar-bg, #424247);
+                            border: none;
                             color: var(--color-base-font, #cdd6f4);
                             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                             font-size: 0.78em;
@@ -162,9 +162,9 @@ INTERACTIVE_CSS = '''
                         .sxng-model-select {
                             appearance: none;
                             -webkit-appearance: none;
-                            background-color: var(--color-sidebar-bg, #1e1e2e);
-                            color: var(--color-search-url, #4a9eff);
-                            border: 1px solid var(--color-search-url, #4a9eff);
+                            background-color: var(--color-sidebar-bg, #424247);
+                            color: var(--color-search-url, #bbb);
+                            border: none;
                             border-radius: 4px;
                             padding: 3px 24px 3px 8px;
                             font-size: 0.78em;
