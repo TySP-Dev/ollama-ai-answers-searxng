@@ -83,6 +83,8 @@ INTERACTIVE_CSS = '''
                             background: var(--color-sidebar-bg, #424247);
                             color: var(--color-search-url, #bbb);
                             cursor: pointer;
+                            vertical-align: middle;
+                            line-height: 1.4;
                         }
                         .sxng-btn:hover {
                             background: var(--color-search-url, #303033);
@@ -103,8 +105,10 @@ INTERACTIVE_CSS = '''
                             color: var(--color-base-font, #cdd6f4);
                             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                             font-size: 0.78em;
-                            padding: 3px 2.5rem 3px 8px;
+                            padding: 3px 8px;
                             border-radius: 4px;
+                            line-height: 1.4;
+                            vertical-align: middle;
                         }
                         .sxng-input:focus { outline: none; }
                         .sxng-input::placeholder { color: var(--color-base-font, #333); opacity: 0.35; }
@@ -153,6 +157,8 @@ INTERACTIVE_CSS = '''
                             background-position: right 6px center;
                             background-size: 8px 5px;
                             display: none;
+                            vertical-align: middle;
+                            line-height: 1.4;
                         }
                         .sxng-model-select:hover {
                             background: var(--color-search-url, #303033);
