@@ -1423,7 +1423,7 @@ class SXNGPlugin(Plugin):
                         }}
                         {interactive_css}
                     </style>
-                    <div class="sxng-ai-label"><span style="color:#4a9eff;font-size:1.1em;">★</span> AI Overview</div>
+                    <span style="color:#4a9eff;font-size:1.1em;">✦</span> AI Overview
                     <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
                     <script>
