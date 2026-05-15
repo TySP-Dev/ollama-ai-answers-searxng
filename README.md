@@ -6,21 +6,21 @@
 <div align="left">
 
 # Ollama AI Answers Plugin for SearXNG
-**Single file install**  
-**Does not block result loading time**  
 **Based on [ai-answers-searxng](https://github.com/cra88y/ai-answers-searxng) by [cra88y](https://github.com/cra88y)**
 
 A SearXNG plugin that generates local AI overviews powered by Ollama, using search results as RAG context.
 
 Features:
-- token-by-token UI streaming
-- clickable inline citations
-- interactive mode: continue summary, ask follow-ups, copy, or regenerate
-- simple response mode with no extras
-- internally called low-latency RAG for follow-ups (bypasses HTTP loopback)
-- native network integration via `searx.network` (respects proxy/SSL settings)
-- stateless conversation persistence/shareability via URL hash
-- model selector in the AI overview widget
+- Token-by-token UI streaming
+- Clickable inline citations
+- Interactive mode: continue summary, ask follow-ups, copy, or regenerate
+- Simple response mode with no extras
+- Internally called low-latency RAG for follow-ups (bypasses HTTP loopback)
+- Native network integration via `searx.network` (respects proxy/SSL settings)
+- Stateless conversation persistence/shareability via URL hash
+- Model selector in the AI overview widget
+- Does not slow down result loading
+- One file install
 
 ## Installation
 
