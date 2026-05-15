@@ -177,6 +177,10 @@ INTERACTIVE_CSS = '''
                             background-size: 8px 5px;
                             display: none;
                         }
+                        .sxng-model-select:hover {
+                            background: var(--color-search-url, #303033);
+                            color: var(--color-sidebar-bg, #bbb);
+                        }
                         .sxng-reasoning {
                             margin: 0.5rem 0; padding: 0.5rem;
                             border-left: 2px solid var(--color-result-link, #5e81ac);
