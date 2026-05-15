@@ -146,7 +146,7 @@ INTERACTIVE_CSS = '''
                             appearance: none;
                             -webkit-appearance: none;
                             background: url("data:image/svg+xml;charset=UTF-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%3Cg%20fill%3D%22%23aaa%22%3E%0A%3Cpolygon%20points%3D%22128%2C192%20256%2C320%20384%2C192%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E") calc(100% + 2rem) / 1rem no-repeat content-box border-box;
-                            background-color: var(--color-toolkit-select-background, #424247);
+                            background-color: #424247;
                             text-overflow: ellipsis;
                             border-width: 0 2rem 0 0;
                             border-color: transparent;
@@ -163,8 +163,8 @@ INTERACTIVE_CSS = '''
                             vertical-align: middle;
                         }
                         sxng-model-select:hover {
-                            background: var(--color-search-url, #303033);
-                            color: var(--color-sidebar-bg, #bbb);
+                            background-color: #303033;
+                            color: var(--color-search-url, #bbb);
                         }
                         .sxng-reasoning {
                             margin: 0.5rem 0; padding: 0.5rem;
@@ -1378,7 +1378,7 @@ class SXNGPlugin(Plugin):
                         }}
                         #sxng-stream-data {{
                             position: relative;
-                            margin-top: 1rem !important;
+                            margin-top: .5rem !important;
                             min-height: 1.5em;
                         }}
                         .sxng-cursor {{
@@ -1403,7 +1403,6 @@ class SXNGPlugin(Plugin):
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
-                            margin-bottom: 4px;
                             margin-top: -4px;
                         }}
                         .sxng-ai-label {{
