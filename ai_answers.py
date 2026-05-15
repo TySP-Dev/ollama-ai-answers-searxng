@@ -146,7 +146,7 @@ INTERACTIVE_CSS = '''
                             appearance: none;
                             -webkit-appearance: none;
                             background: url("data:image/svg+xml;charset=UTF-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%3Cg%20fill%3D%22%23aaa%22%3E%0A%3Cpolygon%20points%3D%22128%2C192%20256%2C320%20384%2C192%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E") calc(100% + 2rem) 0 / 2rem no-repeat content-box border-box;
-                            background: var(--color-sidebar-bg, #424247);
+                            background-color: var(--color-toolkit-select-background, #424247);
                             text-overflow: ellipsis;
                             border-width: 0 2rem 0 0;
                             border-color: transparent;
