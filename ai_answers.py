@@ -78,19 +78,15 @@ INTERACTIVE_CSS = '''
                             width: 32px;
                             height: 32px;
                             padding: 0;
-                            border: 1px solid transparent;
-                            border-radius: 6px;
-                            background: transparent;
-                            color: var(--color-base-font, #333);
+                            border: 1px solid var(--color-search-url, #4a9eff);
+                            border-radius: 4px;
+                            background: var(--color-sidebar-bg, #1e1e2e);
+                            color: var(--color-search-url, #4a9eff);
                             cursor: pointer;
-                            transition: all 0.2s ease;
-                            opacity: 0.6;
                         }
                         .sxng-btn:hover {
-                            background: var(--color-base-background-hover, rgba(0,0,0,0.05));
-                            color: var(--color-result-link, #5e81ac);
-                            opacity: 1;
-                            transform: translateY(-1px);
+                            background: var(--color-search-url, #4a9eff);
+                            color: var(--color-sidebar-bg, #1e1e2e);
                         }
                         .sxng-btn svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-input-wrapper {
@@ -102,16 +98,15 @@ INTERACTIVE_CSS = '''
                         }
                         .sxng-input {
                             width: 100%;
-                            background: transparent;
-                            border: none;
-                            color: var(--color-base-font, #333);
+                            background: var(--color-sidebar-bg, #1e1e2e);
+                            border: 1px solid var(--color-search-url, #4a9eff);
+                            color: var(--color-base-font, #cdd6f4);
                             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                            font-size: 16px;
-                            padding: 0.5rem 2.5rem 0.5rem 0;
-                            opacity: 0.8;
-                            transition: opacity 0.2s;
+                            font-size: 0.78em;
+                            padding: 3px 2.5rem 3px 8px;
+                            border-radius: 4px;
                         }
-                        .sxng-input:focus { outline: none; opacity: 1; }
+                        .sxng-input:focus { outline: none; }
                         .sxng-input::placeholder { color: var(--color-base-font, #333); opacity: 0.35; }
                         .sxng-input-line {
                             position: absolute;
@@ -165,19 +160,23 @@ INTERACTIVE_CSS = '''
                         .sxng-input-submit svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-input-submit svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-model-select {
-                            background: var(--color-sidebar-bg, var(--color-base-background, #f8f8f8));
-                            color: var(--color-base-font, #333);
-                            border: 1px solid var(--color-search-url, rgba(0,0,0,0.15));
-                            border-radius: 6px;
-                            padding: 0.15rem 0.4rem;
-                            font-size: 0.8rem;
+                            appearance: none;
+                            -webkit-appearance: none;
+                            background-color: var(--color-sidebar-bg, #1e1e2e);
+                            color: var(--color-search-url, #4a9eff);
+                            border: 1px solid var(--color-search-url, #4a9eff);
+                            border-radius: 4px;
+                            padding: 3px 24px 3px 8px;
+                            font-size: 0.78em;
                             cursor: pointer;
-                            opacity: 0.7;
-                            transition: opacity 0.2s;
+                            width: auto;
                             max-width: 160px;
+                            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 6l5-6 5 6z' fill='%234a9eff'/%3E%3C/svg%3E");
+                            background-repeat: no-repeat;
+                            background-position: right 6px center;
+                            background-size: 8px 5px;
                             display: none;
                         }
-                        .sxng-model-select:hover { opacity: 1; }
                         .sxng-reasoning {
                             margin: 0.5rem 0; padding: 0.5rem;
                             border-left: 2px solid var(--color-result-link, #5e81ac);
@@ -1414,17 +1413,17 @@ class SXNGPlugin(Plugin):
                             }}
                         }}
                         .sxng-ai-label {{
-                            font-size: 0.72rem;
-                            font-weight: 600;
-                            letter-spacing: 0.05em;
-                            text-transform: uppercase;
-                            opacity: 0.6;
-                            margin-bottom: 0.35rem;
+                            font-size: 1.05em;
+                            font-weight: 700;
+                            margin-bottom: 4px;
+                            margin-top: -4px;
+                            letter-spacing: 0.04em;
+                            text-transform: none;
                             color: var(--color-base-font, #333);
                         }}
                         {interactive_css}
                     </style>
-                    <div class="sxng-ai-label"><span style="color:#4a9eff;">✨</span> AI Overview</div>
+                    <div class="sxng-ai-label"><span style="color:#4a9eff;font-size:1.1em;">★</span> AI Overview</div>
                     <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
                     <script>
