@@ -142,28 +142,40 @@ INTERACTIVE_CSS = '''
                             color: var(--color-result-link, #5e81ac); 
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
+                        .sxng-model-wrap {
+                            display: none;
+                            position: relative;
+                            align-items: stretch;
+                            border: 1px solid var(--color-search-url, #4a9eff);
+                            border-radius: 4px;
+                            overflow: hidden;
+                        }
+                        .sxng-model-wrap.visible {
+                            display: inline-flex;
+                        }
                         .sxng-model-select {
                             appearance: none;
-                            background-color: var(--color-sidebar-bg, #424247);
-                            color: var(--color-search-url, #bbb);
+                            -webkit-appearance: none;
+                            background: var(--color-sidebar-bg, #424247);
+                            color: var(--color-base-font, #cdd6f4);
                             border: none;
-                            border-radius: 4px;
-                            padding: 1px 10px 1px 10px;
+                            border-right: 1px solid var(--color-search-url, #4a9eff);
+                            padding: 3px 8px;
                             font-size: 0.78em;
-                            cursor: pointer;
-                            max-width: 6rem;
-                            background-repeat: no-repeat;
-                            background-position: right;
-                            background-size: 15%;
-                            vertical-align: middle;
                             line-height: 1.4;
-                            margin: 0 0.5rem !important;
-                            overflow: hidden;
-                            height: 32px !important;
+                            vertical-align: middle;
+                            cursor: pointer;
+                            max-width: 140px;
                         }
-                        .sxng-model-select:hover {
-                            background: var(--color-search-url, #303033);
-                            color: var(--color-sidebar-bg, #bbb);
+                        .sxng-model-arrow {
+                            background: var(--color-sidebar-bg, #424247);
+                            color: var(--color-search-url, #4a9eff);
+                            padding: 0 6px;
+                            font-size: 0.85em;
+                            display: flex;
+                            align-items: center;
+                            pointer-events: none;
+                            user-select: none;
                         }
                         .sxng-reasoning {
                             margin: 0.5rem 0; padding: 0.5rem;
@@ -1336,7 +1348,7 @@ class SXNGPlugin(Plugin):
                     "                                            if (m === (_cur || model_init)) o.selected = true;\n"
                     "                                            _msel2.appendChild(o);\n"
                     "                                        });\n"
-                    "                                        _msel2.style.display = 'inline-block';\n"
+                    "                                        document.querySelector('.sxng-model-wrap').classList.add('visible');\n"
                     "                                        console.log('[AI Answers] Model selector shown with', d.models.length, 'models');\n"
                     "                                    })\n"
                     "                                    .catch(err => { console.warn('[AI Answers] /ai-models fetch failed:', err); });\n"
@@ -1418,7 +1430,10 @@ class SXNGPlugin(Plugin):
                         <span class="sxng-ai-label">
                             <span style="color:#4a9eff;font-size:1.1em;">✦</span> AI Overview
                         </span>
-                        <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
+                        <div class="sxng-model-wrap">
+                            <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
+                            <span class="sxng-model-arrow">&#8963;</span>
+                        </div>
                     </div>
                     <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
