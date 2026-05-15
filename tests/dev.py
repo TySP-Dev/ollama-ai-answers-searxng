@@ -114,7 +114,7 @@ searx_network.stream = mock_stream
 searx_network.get = mock_get
 sys.modules["searx.network"] = searx_network
 
-from ai_answers import SXNGPlugin
+from ollama_answers import SXNGPlugin
 from flask_babel import Babel
 
 app = Flask(__name__)
