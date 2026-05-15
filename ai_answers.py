@@ -131,34 +131,11 @@ INTERACTIVE_CSS = '''
                             opacity: 0.55;
                             animation: sxng-fade-in-up 0.3s ease-out forwards;
                         }
-                        .sxng-input-submit {
-                            all: unset;
-                            position: absolute;
-                            right: 0;
-                            top: 50%;
-                            transform: translateY(-50%);
-                            display: inline-flex;
-                            align-items: center;
-                            justify-content: center;
-                            width: 32px;
-                            height: 32px;
-                            padding: 0;
-                            background: transparent !important;
-                            border: none !important;
-                            border-radius: 6px;
-                            color: var(--color-base-font, #333);
-                            cursor: pointer;
-                            opacity: 0.3;
-                            transition: all 0.2s ease;
-                        }
-                        .sxng-input-wrapper:focus-within .sxng-input-submit,
-                        .sxng-input-submit:hover { 
+                        .sxng-input-wrapper:focus-within { 
                             opacity: 1; 
                             color: var(--color-result-link, #5e81ac); 
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
-                        .sxng-input-submit svg { width: 18px; height: 18px; fill: currentColor; }
-                        .sxng-input-submit svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-model-select {
                             appearance: none;
                             -webkit-appearance: none;
@@ -204,7 +181,6 @@ INTERACTIVE_HTML = '''
                         <form id="sxng-action-form" class="sxng-input-wrapper" onsubmit="event.preventDefault();">
                             <input type="text" id="sxng-action-input" class="sxng-input" placeholder="Ask..." aria-label="Ask follow-up" autocomplete="off">
                             <div class="sxng-input-line"></div>
-                            <button type="submit" id="btn-action" class="sxng-input-submit" title="Send / Continue">
                                 <svg viewBox="0 0 24 24"><path d="M19,7V11H5.83L9.41,7.41L8,6L2,12L8,18L9.41,16.59L5.83,13H21V7H19Z"/></svg>
                             </button>
                         </form>
