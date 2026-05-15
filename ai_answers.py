@@ -1146,8 +1146,6 @@ class SXNGPlugin(Plugin):
                         "max_tokens": self.max_tokens,
                         "temperature": self.temperature
                     }
-                    if self.provider == 'ollama':
-                        payload_dict["think"] = False
                     payload = json.dumps(payload_dict)
                     headers = {
                         "Content-Type": "application/json",
@@ -1174,7 +1172,8 @@ class SXNGPlugin(Plugin):
                         return '', "No choices in API response."
                     message = choices[0].get("message", {})
                     content = message.get("content") or ""
-                    reasoning = message.get("reasoning_content") or ""
+                    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                    reasoning = message.get("reasoning") or message.get("reasoning_content") or ""
                     full = (f"<think>\n{reasoning}\n</think>\n\n" if reasoning else "") + content
                     return full, None
                 except Exception as e:
