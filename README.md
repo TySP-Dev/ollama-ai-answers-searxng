@@ -1,7 +1,7 @@
 <div align="center">
 
 [![Main Repo](https://img.shields.io/badge/Main%20Repo-gits.tysstech.com-blue?logo=gitea)](https://git.tysstech.com/tyler/PacCrypt-Webapp)
-[![Mirror Repo](https://img.shields.io/badge/Mirror%20Repo-github.com-blue?logo=github)](https://github.com/TySP-Dev/PacCrypt-Webapp)
+[![Mirror Repo](https://img.shields.io/badge/Mirror%20Repo-github.com-blue?logo=github)](https://github.com/TySP-Dev/ollama-ai-answers-searxng)
 
 <div align="left">
 
