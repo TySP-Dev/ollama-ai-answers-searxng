@@ -454,6 +454,36 @@ INTERACTIVE_JS = r'''
                                 input.scrollIntoView({behavior: 'smooth', block: 'center'});
                             }, 300);
                         };
+
+                        (function fetchModels() {
+                            const _msel2 = document.getElementById('sxng-model-select');
+                            if (!_msel2) return;
+                            const _modelsUrl = script_root + '/ai-models?tk=' + encodeURIComponent(tk_init);
+                            console.log('[AI Answers] Fetching models from', _modelsUrl);
+                            fetch(_modelsUrl)
+                                .then(r => {
+                                    console.log('[AI Answers] /ai-models response status:', r.status);
+                                    return r.ok ? r.json() : Promise.reject('HTTP ' + r.status);
+                                })
+                                .then(d => {
+                                    console.log('[AI Answers] /ai-models payload:', d);
+                                    if (!d || !d.models || d.models.length <= 1) {
+                                        console.log('[AI Answers] Model selector hidden: need 2+ models, got', d && d.models ? d.models.length : 0);
+                                        return;
+                                    }
+                                    const _cur = _msel2.value;
+                                    _msel2.innerHTML = '';
+                                    d.models.forEach(m => {
+                                        const o = document.createElement('option');
+                                        o.value = m; o.textContent = m;
+                                        if (m === (_cur || model_init)) o.selected = true;
+                                        _msel2.appendChild(o);
+                                    });
+                                    document.getElementById('sxng-model-select').style.display = 'inline-block';
+                                    console.log('[AI Answers] Model selector shown with', d.models.length, 'models');
+                                })
+                                .catch(err => { console.warn('[AI Answers] /ai-models fetch failed:', err); });
+                        })();
 '''
 
 FRONTEND_JS_TEMPLATE = r"""
@@ -1311,37 +1341,7 @@ class SXNGPlugin(Plugin):
             interactive_js_init = INTERACTIVE_JS if is_interactive else ''
 
             if is_interactive:
-                interactive_js_complete = (
-                    "footer.style.display = 'flex';\n"
-                    "                            const _msel2 = document.getElementById('sxng-model-select');\n"
-                    "                            if (_msel2 && !_msel2.dataset.loaded) {\n"
-                    "                                const _modelsUrl = script_root + '/ai-models?tk=' + encodeURIComponent(tk_init);\n"
-                    "                                console.log('[AI Answers] Fetching models from', _modelsUrl);\n"
-                    "                                fetch(_modelsUrl)\n"
-                    "                                    .then(r => {\n"
-                    "                                        console.log('[AI Answers] /ai-models response status:', r.status);\n"
-                    "                                        return r.ok ? r.json() : Promise.reject('HTTP ' + r.status);\n"
-                    "                                    })\n"
-                    "                                    .then(d => {\n"
-                    "                                        console.log('[AI Answers] /ai-models payload:', d);\n"
-                    "                                        if (!d || !d.models || d.models.length <= 1) {\n"
-                    "                                            console.log('[AI Answers] Model selector hidden: need 2+ models, got', d && d.models ? d.models.length : 0);\n"
-                    "                                            return;\n"
-                    "                                        }\n"
-                    "                                        const _cur = _msel2.value;\n"
-                    "                                        _msel2.innerHTML = '';\n"
-                    "                                        d.models.forEach(m => {\n"
-                    "                                            const o = document.createElement('option');\n"
-                    "                                            o.value = m; o.textContent = m;\n"
-                    "                                            if (m === (_cur || model_init)) o.selected = true;\n"
-                    "                                            _msel2.appendChild(o);\n"
-                    "                                        });\n"
-                    "                                        document.getElementById('sxng-model-select').style.display = 'inline-block';\n"
-                    "                                        console.log('[AI Answers] Model selector shown with', d.models.length, 'models');\n"
-                    "                                    })\n"
-                    "                                    .catch(err => { console.warn('[AI Answers] /ai-models fetch failed:', err); });\n"
-                    "                            }"
-                )
+                interactive_js_complete = "footer.style.display = 'flex';"
             else:
                 interactive_js_complete = ''
             stream_fn_sig = 'async function startStream(overrideQ = null, prevAnswer = null, auxContext = null)'
