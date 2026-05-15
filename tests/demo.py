@@ -1,11 +1,12 @@
 import sys
 import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logging
 from types import ModuleType
-from flask import Flask, request
+from flask import Flask, request, redirect
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-# os.environ.setdefault('LLM_STYLE', 'interactive')  # Removed to let plugin config decide defaults
+os.environ.setdefault('LLM_URL', 'http://localhost:11434/v1/chat/completions')
 
 # SearXNG module mocks
 searx = ModuleType("searx")
@@ -32,6 +33,9 @@ class MockEngineResults:
 searx_plugins.Plugin = MockPlugin
 searx_plugins.PluginInfo = MockPluginInfo
 searx_results.EngineResults = MockEngineResults
+
+searx.settings = {'server': {'secret_key': 'demo-secret'}}
+searx.network = ModuleType("searx.network")
 
 sys.modules["searx"] = searx
 sys.modules["searx.plugins"] = searx_plugins
@@ -122,6 +126,21 @@ class MockConfig:
 plugin = SXNGPlugin(MockConfig())
 plugin.init(app)
 
+@app.route("/config", methods=["POST"])
+def update_config():
+    url = request.form.get("url", "").strip()
+    bearer = request.form.get("bearer", "").strip()
+    model = request.form.get("model", "").strip()
+    query = request.form.get("q", "")
+    if url:
+        plugin.endpoint_url = url
+    plugin.api_key = bearer if bearer else "ollama"
+    if model:
+        plugin.model = model
+    redirect_q = f"?q={query}" if query else ""
+    return redirect(f"/{redirect_q}")
+
+
 @app.route("/search")
 def mock_search():
     query = request.args.get("q", "")
@@ -192,6 +211,7 @@ def index():
     if search.result_container.answers:
         injection_html = list(search.result_container.answers)[0]
     
+    bearer_display = plugin.api_key if plugin.api_key != "ollama" else ""
     return f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -199,10 +219,10 @@ def index():
         <meta charset="UTF-8">
         <title>AI Answers Demo</title>
         <style>
-            body {{ 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-                padding: 2rem; 
-                max-width: 800px; 
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                padding: 2rem;
+                max-width: 800px;
                 margin: 0 auto;
                 background: #2e3440;
                 color: #eceff4;
@@ -213,29 +233,114 @@ def index():
                 --color-base-font: #88c0d0;
                 --color-result-link: #81a1c1;
             }}
-            h1 {{ color: #88c0d0; }}
             .meta {{ color: #81a1c1; font-size: 0.9rem; }}
             hr {{ border-color: #4c566a; }}
             a {{ color: #88c0d0; }}
+            .config-panel {{
+                background: #3b4252;
+                border-radius: 6px;
+                padding: 1rem 1.25rem;
+                margin-bottom: 1.25rem;
+            }}
+            .config-panel summary {{
+                cursor: pointer;
+                font-size: 0.85rem;
+                color: #81a1c1;
+                user-select: none;
+            }}
+            .config-panel summary:hover {{ color: #88c0d0; }}
+            .config-row {{
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                margin-top: 0.75rem;
+            }}
+            .config-row label {{
+                font-size: 0.8rem;
+                color: #81a1c1;
+            }}
+            .config-row input {{
+                background: #2e3440;
+                border: 1px solid #4c566a;
+                border-radius: 4px;
+                color: #eceff4;
+                font-size: 0.85rem;
+                padding: 0.4rem 0.6rem;
+                width: 100%;
+                box-sizing: border-box;
+            }}
+            .config-row input:focus {{ outline: none; border-color: #81a1c1; }}
+            .config-btn {{
+                margin-top: 0.75rem;
+                background: #4c566a;
+                border: none;
+                border-radius: 4px;
+                color: #eceff4;
+                cursor: pointer;
+                font-size: 0.85rem;
+                padding: 0.4rem 1rem;
+            }}
+            .config-btn:hover {{ background: #5e81ac; }}
+            .search-row {{
+                display: flex;
+                gap: 0.5rem;
+                margin-bottom: 1.25rem;
+            }}
+            .search-row input {{
+                flex: 1;
+                background: #3b4252;
+                border: 1px solid #4c566a;
+                border-radius: 4px;
+                color: #eceff4;
+                font-size: 0.95rem;
+                padding: 0.45rem 0.75rem;
+            }}
+            .search-row input:focus {{ outline: none; border-color: #81a1c1; }}
+            .search-row button {{
+                background: #5e81ac;
+                border: none;
+                border-radius: 4px;
+                color: #eceff4;
+                cursor: pointer;
+                font-size: 0.9rem;
+                padding: 0.45rem 1rem;
+            }}
+            .search-row button:hover {{ background: #81a1c1; }}
         </style>
     </head>
     <body>
-        <div style="margin-top: 2rem;"></div>
-        <p class="meta">Provider: <strong>{plugin.provider or 'Not configured'}</strong> | Model: <strong>{plugin.model or 'N/A'}</strong></p>
-        <p>Query: <strong>{query}</strong></p>
+        <details class="config-panel" {'open' if not bearer_display and 'localhost' in plugin.endpoint_url else ''}>
+            <summary>&#9881; Ollama Configuration</summary>
+            <form method="POST" action="/config">
+                <input type="hidden" name="q" value="{query}">
+                <div class="config-row">
+                    <label>Endpoint URL</label>
+                    <input type="text" name="url" value="{plugin.endpoint_url}" placeholder="http://localhost:11434/v1/chat/completions">
+                </div>
+                <div class="config-row">
+                    <label>Bearer Token <span style="opacity:0.5;">(optional)</span></label>
+                    <input type="text" name="bearer" value="{bearer_display}" placeholder="Leave empty if not required">
+                </div>
+                <button type="submit" class="config-btn">Apply</button>
+            </form>
+        </details>
+
+        <form class="search-row" method="GET" action="/">
+            <input type="text" name="q" value="{query}" placeholder="Ask something...">
+            <button type="submit">Search</button>
+        </form>
+
+        <p class="meta">Model: <strong>{plugin.model}</strong></p>
         <hr>
-        {injection_html if injection_html else '<p style="color:#f66;">Plugin inactive. Set LLM_PROVIDER and LLM_KEY in .env</p>'}
-        <hr>
-        <p class="meta">Try: <a href="/?q=what+is+quantum+computing">/?q=what+is+quantum+computing</a></p>
+        {injection_html if injection_html else '<p style="color:#f66;">No response — check your Ollama endpoint and token above.</p>'}
     </body>
     </html>
     """
 
 if __name__ == "__main__":
     print("AI Answers - Demo\n")
-    print(f"  Provider: {plugin.provider or 'NOT SET'}")
+    print(f"  Endpoint: {plugin.endpoint_url}")
     print(f"  Model:    {plugin.model or 'N/A'}")
     print(f"  Mode:     {'interactive' if plugin.interactive else 'simple'}")
-    print(f"  Status:   {'active' if plugin.api_key else 'inactive (no LLM_KEY)'}")
     print(f"\n  http://localhost:5000/?q=why+is+the+sky+blue\n")
     app.run(debug=False, port=5000)
