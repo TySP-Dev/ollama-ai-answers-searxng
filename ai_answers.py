@@ -1053,7 +1053,10 @@ class SXNGPlugin(Plugin):
             lang_instruction = f" Respond in {lang}." if lang not in ('all', 'auto') else ""
 
             base_sys = self.system_prompt if self.system_prompt else "You are a direct, citation-accurate search synthesis engine."
-            SYSTEM = f"{base_sys} Today is {today}.{lang_instruction}"
+            SYSTEM = (f"{base_sys} Today is {today}.{lang_instruction} "
+                      "Output only your final answer. Do not output your thinking process, "
+                      "reasoning steps, or internal monologue. Begin your response with the "
+                      "direct answer immediately.")
             max_source_idx = 0
             if context_text:
                 indices = re.findall(r'\[(\d+)\]', context_text)
@@ -1141,7 +1144,11 @@ class SXNGPlugin(Plugin):
                     conn, path = _get_streaming_connection(self.endpoint_url)
                     payload_dict = {
                         "model": effective_model,
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": [
+                            {"role": "system",    "content": SYSTEM},
+                            {"role": "user",      "content": prompt},
+                            {"role": "assistant", "content": ""},
+                        ],
                         "stream": False,
                         "max_tokens": self.max_tokens,
                         "temperature": self.temperature
@@ -1174,13 +1181,14 @@ class SXNGPlugin(Plugin):
                     content = re.sub(r'<think>.*?</think>', '', message.get("content") or "", flags=re.DOTALL).strip()
                     reasoning = message.get("reasoning") or message.get("reasoning_content") or ""
                     if not content and reasoning:
-                        # Model put the answer in the reasoning field (qwen3 think:False behaviour).
-                        # Extract the final answer: take everything after the last numbered/bulleted
-                        # step line, or fall back to the last two non-empty paragraphs.
-                        answer = re.split(r'\n(?:\d+[.)]\s|\*\s)', reasoning)[-1].strip()
-                        if not answer:
+                        logger.warning(f"{PLUGIN_NAME}: {self.provider} returned empty content; extracting answer from reasoning field")
+                        header_pat = re.compile(r'^\s*\*?\*?[A-Z][^:]{0,40}:\*?\*?\s*$', re.MULTILINE)
+                        matches = list(header_pat.finditer(reasoning))
+                        if matches:
+                            answer = reasoning[matches[-1].end():].strip()
+                        else:
                             paras = [p.strip() for p in re.split(r'\n{2,}', reasoning) if p.strip()]
-                            answer = '\n\n'.join(paras[-2:]) if len(paras) >= 2 else reasoning.strip()
+                            answer = paras[-1] if paras else reasoning.strip()
                         full = answer
                     else:
                         full = (f"<think>\n{reasoning}\n</think>\n\n" if reasoning else "") + content
