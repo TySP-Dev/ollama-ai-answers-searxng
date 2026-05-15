@@ -1,7 +1,7 @@
 # Ollama AI Answers Plugin for SearXNG
 **Single file install**  
 **Does not block result loading time**
-**Based on [ai-answers-searxng](https://github.com/cra88y/ai-answers-searxng) by [cra88y](https://github.com/cra88y)
+**Based on [ai-answers-searxng](https://github.com/cra88y/ai-answers-searxng) by [cra88y](https://github.com/cra88y)**
 
 A SearXNG plugin that generates local AI overviews powered by Ollama, using search results as RAG context.
 
