@@ -1016,7 +1016,75 @@ class SXNGPlugin(Plugin):
 <CORE_DIRECTIVES>
 {numbered_instructions}
 </CORE_DIRECTIVES>"""
-            
+
+            def call_ollama():
+                conn = None
+                try:
+                    conn, path = _get_streaming_connection(self.endpoint_url)
+                    payload_dict = {
+                        "model": effective_model,
+                        "messages": [
+                            {"role": "system",    "content": SYSTEM},
+                            {"role": "user",      "content": prompt},
+                            {"role": "assistant", "content": ""},
+                        ],
+                        "stream": False,
+                        "max_tokens": self.max_tokens,
+                        "temperature": self.temperature,
+                    }
+                    payload = json.dumps(payload_dict)
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.api_key}",
+                    }
+                    conn.request("POST", path, body=payload.encode('utf-8'), headers=headers)
+                    res = conn.getresponse()
+                    if res.status != 200:
+                        body = res.read(1024).decode('utf-8', errors='replace')
+                        logger.error(f"{PLUGIN_NAME}: Ollama {res.status}: {body}")
+                        return '', f"Ollama error {res.status}"
+                    obj = json.loads(res.read().decode('utf-8', errors='replace'))
+                    if 'error' in obj:
+                        err = obj['error']
+                        msg = err.get('message', str(err)) if isinstance(err, dict) else str(err)
+                        return '', msg
+                    choices = obj.get('choices', [])
+                    if not choices:
+                        return '', "No choices in Ollama response."
+                    message = choices[0].get('message', {})
+                    content = message.get('content') or ''
+                    reasoning = message.get('reasoning') or message.get('reasoning_content') or ''
+                    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                    if not content and reasoning:
+                        logger.warning(f"{PLUGIN_NAME}: content empty, extracting from reasoning field")
+                        lines = reasoning.splitlines()
+                        header_re = re.compile(r'^\s*\*?\*?[A-Z][^:]{0,40}:\*?\*?\s*$')
+                        last_header_idx = -1
+                        for i, line in enumerate(lines):
+                            if header_re.match(line):
+                                last_header_idx = i
+                        if last_header_idx >= 0 and last_header_idx < len(lines) - 1:
+                            content = '\n'.join(lines[last_header_idx + 1:]).strip()
+                        if not content:
+                            paragraphs = [p.strip() for p in reasoning.split('\n\n') if p.strip()]
+                            content = '\n\n'.join(paragraphs[-2:]) if len(paragraphs) >= 2 else paragraphs[-1] if paragraphs else ''
+                    if reasoning and content:
+                        full = (f"<think>\n{reasoning}\n</think>\n\n" if reasoning else "") + content
+                    else:
+                        full = content
+                    full = re.sub(r'<think>.*?</think>', '', full, flags=re.DOTALL).strip()
+                    return full, None
+                except Exception as e:
+                    logger.error(f"{PLUGIN_NAME}: Ollama call error: {e}", exc_info=True)
+                    return '', f"Connection Error: {e}"
+                finally:
+                    if conn:
+                        conn.close()
+
+            text, error = call_ollama()
+            return jsonify({"text": text, "error": error})
+        return True
+
     def _assemble_context(self, clean_results, infoboxes, answers, offset=0) -> tuple[str, list]:
         """Builds context string from normalized search data. Returns (context_str, urls)."""
         context_parts = []
