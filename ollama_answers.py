@@ -170,6 +170,24 @@ INTERACTIVE_CSS = '''
                         .sxng-reasoning:hover { opacity: 1; }
                         .sxng-reasoning summary { cursor: pointer; font-weight: bold; color: var(--color-result-link, #5e81ac); }
                         .sxng-thought-content { margin-top: 0.5rem; white-space: pre-wrap; font-family: monospace; }
+                        .sxng-citation-footer {
+                            margin-top: 0.75rem;
+                            padding-top: 0.5rem;
+                            border-top: 1px solid var(--color-sidebar-bg, #424247);
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 0.4rem 0.75rem;
+                        }
+                        .sxng-citation-item a {
+                            font-size: 0.75em;
+                            color: var(--color-result-link, #5e81ac);
+                            text-decoration: none;
+                            opacity: 0.75;
+                        }
+                        .sxng-citation-item a:hover {
+                            opacity: 1;
+                            text-decoration: underline;
+                        }
 '''
 
 INTERACTIVE_HTML = '''
@@ -239,6 +257,39 @@ CITATION_HELPER_JS = r'''
                                 fragment.appendChild(s);
                             }
                             return fragment;
+                        }
+
+                        function renderCitationFooter(textContent, urls, container) {
+                            const re = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
+                            const usedIndices = new Set();
+                            let m;
+                            while ((m = re.exec(textContent)) !== null) {
+                                m[1].split(/\s*,\s*/).forEach(n => {
+                                    const idx = parseInt(n.trim());
+                                    if (idx >= 1 && idx <= urls.length && urls[idx - 1]) {
+                                        usedIndices.add(idx);
+                                    }
+                                });
+                            }
+                            if (usedIndices.size === 0) return;
+                            const sorted = [...usedIndices].sort((a, b) => a - b);
+                            const footer = document.createElement('div');
+                            footer.className = 'sxng-citation-footer';
+                            sorted.forEach(n => {
+                                const url = urls[n - 1];
+                                if (!url) return;
+                                let domain;
+                                try { domain = new URL(url).hostname.replace('www.', ''); } catch(e) { domain = url; }
+                                const item = document.createElement('span');
+                                item.className = 'sxng-citation-item';
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.target = '_blank';
+                                a.textContent = `[${n}] ${domain}`;
+                                item.appendChild(a);
+                                footer.appendChild(item);
+                            });
+                            container.appendChild(footer);
                         }
 '''
 
@@ -687,6 +738,8 @@ FRONTEND_JS_TEMPLATE = r"""
                     break;
                 }
             }
+
+            renderCitationFooter(mainText, urls, data);
 
             const collectedResponse = mainText;
 
