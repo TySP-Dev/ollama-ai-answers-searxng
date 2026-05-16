@@ -1,4 +1,4 @@
-import json, os, logging, base64, time, hashlib, re, http.client, ssl
+import json, os, logging, base64, time, hashlib, re, http.client, ssl, concurrent.futures
 from urllib.parse import urlparse
 from searx import network
 try:
@@ -1124,6 +1124,113 @@ class SXNGPlugin(Plugin):
             return jsonify({"text": text, "error": error})
         return True
 
+    def _fetch_page_text(self, url: str, timeout: int = 5) -> str:
+        SKIP_DOMAINS = ('youtube.com', 'twitter.com', 'x.com', 'instagram.com', 'facebook.com', 'reddit.com')
+        try:
+            if url.endswith('.pdf'):
+                return ''
+            if any(d in url for d in SKIP_DOMAINS):
+                return ''
+
+            current_url = url
+            for _ in range(3):  # initial request + up to 2 redirects
+                parsed = urlparse(current_url)
+                host = parsed.hostname or ''
+                if not host:
+                    return ''
+                port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+                path = (parsed.path or '/') + ('?' + parsed.query if parsed.query else '')
+
+                if parsed.scheme == 'https':
+                    try:
+                        import certifi
+                        ctx = ssl.create_default_context(cafile=certifi.where())
+                    except ImportError:
+                        ctx = ssl.create_default_context()
+                    conn = http.client.HTTPSConnection(host, port, timeout=timeout, context=ctx)
+                else:
+                    conn = http.client.HTTPConnection(host, port, timeout=timeout)
+
+                try:
+                    conn.request('GET', path, headers={'User-Agent': 'Mozilla/5.0 (compatible; SearXNG-AI/1.0)'})
+                    res = conn.getresponse()
+
+                    if res.status in (301, 302, 303, 307, 308):
+                        location = res.getheader('Location', '')
+                        res.read()
+                        if not location:
+                            return ''
+                        current_url = location if location.startswith('http') else f"{parsed.scheme}://{parsed.netloc}{location}"
+                        continue
+
+                    if res.status != 200:
+                        return ''
+
+                    html = res.read(512 * 1024).decode('utf-8', errors='replace')
+                finally:
+                    conn.close()
+
+                html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                html = re.sub(r'<nav[^>]*>.*?</nav>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                html = re.sub(r'<header[^>]*>.*?</header>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                html = re.sub(r'<footer[^>]*>.*?</footer>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                text = re.sub(r'<[^>]+>', '', html)
+                text = (text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                            .replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' '))
+                text = re.sub(r'\s+', ' ', text).strip()
+
+                logger.debug(f"{PLUGIN_NAME}: fetched {len(text)} chars from {url}")
+                return text[:2000]
+
+            return ''
+        except Exception:
+            return ''
+
+    def _enrich_results(self, clean_results: list, query: str) -> list:
+        enrich_count = min(3, self.context_deep_count)
+        for r in clean_results:
+            r['fetched_content'] = ''
+
+        futures_map: dict = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            for r in clean_results[:enrich_count]:
+                futures_map[executor.submit(self._fetch_page_text, r.get('url', ''))] = r
+
+            for future, r in futures_map.items():
+                try:
+                    text = future.result(timeout=6)
+                    if text and len(text) > 100:
+                        words = query.lower().split()
+                        text_lower = text.lower()
+                        best_pos = len(text) // 2
+                        best_count = -1
+
+                        keyword_positions = []
+                        for word in words:
+                            start = 0
+                            while True:
+                                idx = text_lower.find(word, start)
+                                if idx == -1:
+                                    break
+                                keyword_positions.append(idx)
+                                start = idx + 1
+
+                        for pos in (keyword_positions or [best_pos]):
+                            window_start = max(0, pos - 400)
+                            window_end = min(len(text), pos + 400)
+                            count = sum(w in text_lower[window_start:window_end] for w in words)
+                            if count > best_count:
+                                best_count = count
+                                best_pos = pos
+
+                        start = max(0, best_pos - 400)
+                        r['fetched_content'] = text[start:start + 800]
+                except Exception:
+                    pass
+
+        return clean_results
+
     def _assemble_context(self, clean_results, infoboxes, answers, offset=0) -> tuple[str, list]:
         """Builds context string from normalized search data. Returns (context_str, urls)."""
         context_parts = []
@@ -1160,9 +1267,14 @@ class SXNGPlugin(Plugin):
             domain = urlparse(url).netloc.replace('www.', '')
             date_str = f" ({r.get('publishedDate')})" if r.get('publishedDate') else ""
             title = r.get('title', '').replace('\n', ' ').strip()
-            content = str(r.get('content', '')).replace('\n', ' ').strip()[:800]
             idx = i + 1 + offset
-            deep_lines.append(f"[{idx}] {domain}{date_str}: {title}: {content}")
+            fetched_content = r.get('fetched_content', '')
+            if fetched_content:
+                deep_lines.append(f"[{idx}] {domain}{date_str}: {title}: {fetched_content}")
+            else:
+                logger.debug(f"{PLUGIN_NAME}: falling back to snippet for [{idx}] {domain}")
+                content = str(r.get('content', '')).replace('\n', ' ').strip()[:800]
+                deep_lines.append(f"[{idx}] {domain}{date_str}: {title}: {content}")
         
         if deep_lines:
             context_parts.append("DEEP SOURCES:\n" + "\n".join(deep_lines))
@@ -1206,11 +1318,12 @@ class SXNGPlugin(Plugin):
             raw_infoboxes = getattr(search.result_container, 'infoboxes', [])
             raw_answers = getattr(search.result_container, 'answers', [])
             
+            q_clean = search.search_query.query.strip()
             clean_results, infoboxes, answers = self._parse_aux_results(raw_results, raw_infoboxes, raw_answers)
+            clean_results = self._enrich_results(clean_results, q_clean)
             context_str, _ = self._assemble_context(clean_results, infoboxes, answers)
 
             ts = str(int(time.time()))
-            q_clean = search.search_query.query.strip()
             lang = search.search_query.lang
             sig = hashlib.sha256(f"{ts}{self.secret}".encode()).hexdigest()
             tk = f"{ts}.{sig}"
