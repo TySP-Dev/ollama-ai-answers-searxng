@@ -103,18 +103,25 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
         else:
             raise RuntimeError("Too many redirects to Ollama endpoint")
 
+        logger.error(f"AI Answers: Ollama response status: {res.status}")
+
         if res.status != 200:
             body = res.read(1024).decode('utf-8', errors='replace')
             raise RuntimeError(f"Ollama error {res.status}: {body[:200]}")
 
         think_depth = 0
         pending = ''
+        chunk_count = 0
+        line_count = 0
 
         while True:
             raw_line = res.readline()
             if not raw_line:
                 break
             line = raw_line.decode('utf-8', errors='replace').rstrip('\r\n')
+            if line_count < 20:
+                logger.error(f"AI Answers: raw line [{line_count}]: {repr(line)}")
+            line_count += 1
             if not line or not line.startswith('data: '):
                 continue
             data_str = line[6:]
@@ -122,7 +129,8 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
                 break
             try:
                 obj = json.loads(data_str)
-            except (json.JSONDecodeError, ValueError):
+            except (json.JSONDecodeError, ValueError) as parse_err:
+                logger.error(f"AI Answers: JSON parse error on line {line_count}: {parse_err!r}, data={repr(data_str[:100])}", exc_info=True)
                 continue
             choices = obj.get('choices', [])
             if not choices:
@@ -141,6 +149,7 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
                         if pending:
                             vk.rpush(chunks_key, pending)
                             vk.expire(chunks_key, 120)
+                            chunk_count += 1
                             pending = ''
                         break
                     else:
@@ -148,6 +157,7 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
                         if before:
                             vk.rpush(chunks_key, before)
                             vk.expire(chunks_key, 120)
+                            chunk_count += 1
                         pending = pending[think_start + 7:]
                         think_depth = 1
                 else:
@@ -161,7 +171,9 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
         if think_depth == 0 and pending:
             vk.rpush(chunks_key, pending)
             vk.expire(chunks_key, 120)
+            chunk_count += 1
 
+        logger.error(f"AI Answers: stream complete, wrote {chunk_count} chunks, saw {line_count} lines")
         vk.rpush(chunks_key, '__DONE__')
         vk.expire(chunks_key, 120)
         vk.set(status_key, 'done', ex=120)
