@@ -15,7 +15,7 @@ A SearXNG plugin that generates local AI overviews powered by Ollama, using sear
 - Inline numbered citations
 - Interactive mode - Continue summary, ask follow-ups, copy, or regenerate
 - Overview of ranked results with prompts based on detected query intent:
-  - `How To` `Technical` `Factual` `Comparison` `Opinion` `Current` `Local` `Geneal, General
+  - `How To` `Technical` `Factual` `Comparison` `Opinion` `Current` `Local` `Geneal`
 - Internally called RAG for follow-ups
 - Native network integration via `searx.network`
 - Stateless conversation presistence/shareability via URL hash
