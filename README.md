@@ -10,44 +10,50 @@
 
 A SearXNG plugin that generates local AI overviews powered by Ollama, using search results as RAG context.
 
-Features:
-- Token-by-token UI streaming
-- Clickable inline citations
-- Interactive mode: continue summary, ask follow-ups, copy, or regenerate
-- Simple response mode with no extras
-- Internally called low-latency RAG for follow-ups (bypasses HTTP loopback)
-- Native network integration via `searx.network` (respects proxy/SSL settings)
-- Stateless conversation persistence/shareability via URL hash
-- Model selector in the AI overview widget
-- Does not slow down result loading
-- One file install
-- Real-time streaming via Valkey — responses stream token by token using a background thread + Valkey job queue, working around granian's broken generator support for true streaming feel
-- TF-IDF result reranking — fetched page content is scored against the query using BM25-style TF-IDF before being sent to Ollama, surfacing the most relevant sources first
-- Smart chunking — pages are split into 512-token overlapping segments and the highest-scoring chunk per page is selected for context
-- Intent detection — queries are automatically classified into 8 intent types (factual, howto, technical, comparison, opinion, current, local, general) with tailored system prompts per type
-- Conversation memory — 30-minute cross-search conversation history stored in Valkey, so follow-up questions work even after navigating to a new search
-- Markdown rendering — AI responses render bold, italic, lists, headers, and inline code natively in the result box
-- Intent emoji badge — a small emoji appears next to "AI Overview" indicating the detected query type
+## Features:
+
+- Inline numbered citations
+- Interactive mode - Continue summary, ask follow-ups, copy, or regenerate
+- Overview of ranked results with prompts based on detected query intent:
+  - `How To` `Technical` `Factual` `Comparison` `Opinion` `Current` `Local` `Geneal, General
+- Internally called RAG for follow-ups
+- Native network integration via `searx.network`
+- Stateless conversation presistence/shareability via URL hash
+- Ollama model selector
+- Feeds fetched results to Ollama without slowing down SearXNG  results
+- Real-time streaming via Valkey (No waiting for a completed response)
+- TF-IDF result ranking before being sent to Ollama
+- Smart chunking - Pages are split into 512-token segments and highest-scoring chunk per page used for context
+- Conversation memory - 30-minute cross-search conversation history via Valkey for follow-up questions
+- Markdown support
+- Intent emoji badge showing what intent prompt was used 
 
 ## Install
 
 1. Download the plugin:
+
+   ### Main repo (Gitea)
    ```bash
-   curl -o ollama_answers.py https://raw.githubusercontent.com/TySP-Dev/ollama-ai-answers-searxng/master/ollama_answers.py
+   curl -o ollama_answers.py https://git.tysstech.com/TySS-Dev/ollama-ai-answers-searxng/raw/branch/main/ollama_answers.py
    ```
 
-2. Copy to your SearXNG plugins directory:
+   ### Mirror repo (Github):
    ```bash
-   cp ollama_answers.py ~/searxng/plugins/ollama_answers.py
+   curl -o ollama_answers.py https://raw.githubusercontent.com/TySP-Dev/ollama-ai-answers-searxng/main/ollama_answers.py
    ```
 
-3. Add the volume mount to your `docker-compose.yml` under the searxng service:
+3. Copy to your SearXNG plugins directory:
+   ```bash
+   cp ollama_answers.py path_to/searxng/plugins/ollama_answers.py
+   ```
+
+4. Add the volume mount to your `docker-compose.yml` under the searxng service:
    ```yaml
    volumes:
      - ./plugins/ollama_answers.py:/usr/local/searxng/searx/plugins/ollama_answers.py:Z
    ```
 
-4. Add environment variables to `docker-compose.yml`:
+5. Add environment variables to `docker-compose.yml`:
    ```yaml
    environment:
      - LLM_URL=http://ollama:11434/v1/chat/completions
@@ -55,14 +61,14 @@ Features:
      - VALKEY_HOST=searxng-valkey
    ```
 
-5. Add to `settings.yml` plugins section:
+6. Add to `settings.yml` plugins section:
    ```yaml
    plugins:
      searx.plugins.ollama_answers.SXNGPlugin:
        active: true
    ```
 
-6. Restart SearXNG:
+7. Restart SearXNG:
    ```bash
    docker compose up -d --force-recreate core
    ```
