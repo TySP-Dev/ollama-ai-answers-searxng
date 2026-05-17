@@ -26,6 +26,7 @@ except ImportError:
 TOKEN_EXPIRY_SEC = 3600
 STREAM_CHUNK_SIZE = 512
 STREAM_TIMEOUT_SEC = 60
+CONV_TTL = 1800
 
 def _get_streaming_connection(url: str, verify_ssl: bool = True):
     parsed = urlparse(url)
@@ -114,6 +115,26 @@ def _get_valkey():
     if not _VALKEY_AVAILABLE or _valkey_mod is None:
         raise RuntimeError("valkey package not installed")
     return _valkey_mod.Valkey(connection_pool=_get_valkey_pool())
+
+
+def _load_conversation(session_id: str) -> list:
+    try:
+        v = _get_valkey()
+        raw = v.get(f"ai:conv:{session_id}")
+        if raw:
+            return json.loads(raw)
+    except Exception as e:
+        logger.debug(f"{PLUGIN_NAME}: conv load failed: {e}")
+    return []
+
+
+def _save_conversation(session_id: str, turns: list) -> None:
+    try:
+        v = _get_valkey()
+        turns = turns[-20:]
+        v.setex(f"ai:conv:{session_id}", CONV_TTL, json.dumps(turns))
+    except Exception as e:
+        logger.debug(f"{PLUGIN_NAME}: conv save failed: {e}")
 
 
 def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str, model: str):
@@ -370,6 +391,23 @@ INTERACTIVE_CSS = '''
                             opacity: 1;
                             text-decoration: underline;
                         }
+                        .sxng-prior-history {
+                            margin-bottom: 0.75rem;
+                            padding: 0.5rem;
+                            border-left: 2px solid var(--color-result-link, #5e81ac);
+                            opacity: 0.6;
+                            font-size: 0.85em;
+                        }
+                        .sxng-prior-history summary {
+                            cursor: pointer;
+                            color: var(--color-result-link, #5e81ac);
+                            font-weight: 600;
+                        }
+                        .sxng-prior-answer {
+                            margin: 0.25rem 0;
+                            padding-left: 0.5rem;
+                            color: var(--color-base-font, #cdd6f4);
+                        }
 '''
 
 INTERACTIVE_HTML = '''
@@ -379,6 +417,9 @@ INTERACTIVE_HTML = '''
                         </button>
                         <button class="sxng-btn" id="btn-regen" title="Regenerate answer">
                             <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4.01 7.58 4.01 12C4.01 16.42 7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12C6 8.69 8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z"/></svg>
+                        </button>
+                        <button class="sxng-btn" id="btn-clear-history" title="Clear conversation history">
+                            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                         </button>
                         <form id="sxng-action-form" class="sxng-input-wrapper" onsubmit="event.preventDefault();">
                             <input type="text" id="sxng-action-input" class="sxng-input" placeholder="Ask..." aria-label="Ask follow-up" autocomplete="off">
@@ -594,13 +635,13 @@ INTERACTIVE_JS = r'''
                         document.getElementById('btn-regen').onclick = async () => {
                             data.innerHTML = '<span class="sxng-cursor"></span>';
                             footer.style.display = 'none';
-                            
+
                             if (conversation.turns.length > 0 && conversation.turns[conversation.turns.length - 1].role === 'assistant') {
                                 conversation.turns.pop();
                             }
-                            
+
                             updateState();
-                            
+
                             if (conversation.turns.length <= 1) {
                                 await startStream();
                             } else {
@@ -612,6 +653,22 @@ INTERACTIVE_JS = r'''
                             }
                             updateState();
                         };
+
+                        const btnClearHistory = document.getElementById('btn-clear-history');
+                        if (btnClearHistory) {
+                            btnClearHistory.onclick = async () => {
+                                if (!session_id_init) return;
+                                try {
+                                    await fetch(`${script_root}/ai-conversation`, {
+                                        method: 'DELETE',
+                                        headers: {'Content-Type': 'application/json'},
+                                        body: JSON.stringify({tk: tk_init, session_id: session_id_init})
+                                    });
+                                } catch(e) {}
+                                conversation.turns = [{role: 'user', content: q_init, ts: Date.now()}];
+                                location.reload();
+                            };
+                        }
 
                         const handleAction = async (e) => {
                             if (e) e.preventDefault();
@@ -649,7 +706,7 @@ INTERACTIVE_JS = r'''
                                     const auxData = await fetch(script_root + '/ai-auxiliary-search', {
                                         method: 'POST',
                                         headers: {'Content-Type': 'application/json'},
-                                        body: JSON.stringify({query: synthesized, lang: lang_init, offset: urls.length, tk: tk_init})
+                                        body: JSON.stringify({query: synthesized, lang: lang_init, offset: urls.length, tk: tk_init, session_id: session_id_init})
                                     }).then(r => r.json());
                                     if (auxData.context) {
                                         const originalBackground = conversation.originalContext.substring(0, 1500);
@@ -723,6 +780,10 @@ FRONTEND_JS_TEMPLATE = r"""
     const tk_init = __TK__;
     const script_root = __SCRIPT_ROOT__;
     const model_init = __MODEL_INIT__;
+    const session_id_init = __SESSION_ID__;
+    if (session_id_init && !document.cookie.includes('sxng_ai_session')) {
+        document.cookie = `sxng_ai_session=${session_id_init}; path=/; max-age=1800; SameSite=Lax`;
+    }
     const conversation = {
         originalQuery: q_init,
         originalContext: new TextDecoder().decode(Uint8Array.from(atob(b64_init), c => c.charCodeAt(0))),
@@ -739,6 +800,45 @@ FRONTEND_JS_TEMPLATE = r"""
     __CITATION_HELPER_JS__
 
     __INTERACTIVE_JS_INIT__
+
+    async function loadPriorConversation() {
+        if (!session_id_init) return;
+        try {
+            const res = await fetch(
+                `${script_root}/ai-conversation?tk=${encodeURIComponent(tk_init)}&session_id=${session_id_init}`
+            );
+            if (!res.ok) return;
+            const d = await res.json();
+            const turns = d.turns || [];
+            if (turns.length === 0) return;
+            const historyDiv = document.createElement('details');
+            historyDiv.className = 'sxng-prior-history';
+            historyDiv.innerHTML = '<summary>Prior conversation</summary>';
+            turns.slice(-6).forEach(turn => {
+                const el = document.createElement('div');
+                el.className = turn.role === 'user' ? 'sxng-user-msg' : 'sxng-prior-answer';
+                el.textContent = turn.content;
+                historyDiv.appendChild(el);
+            });
+            data.insertBefore(historyDiv, data.firstChild);
+        } catch(e) {
+            console.debug('[AI Answers] Could not load prior conversation:', e);
+        }
+    }
+
+    async function saveConversationTurn() {
+        if (!session_id_init) return;
+        try {
+            const turns = conversation.turns.slice(-20);
+            await fetch(`${script_root}/ai-conversation`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({tk: tk_init, session_id: session_id_init, turns: turns})
+            });
+        } catch(e) {
+            console.debug('[AI Answers] Could not save conversation:', e);
+        }
+    }
 
     function synthesizeQuery(original, followup) {
         const cleanOrig = original.replace(/^(what|how|why|when|where|who|which|is|are|can|does|do)(\s+(is|are|do|does|can|to|a|an|the))?\s+/i, '');
@@ -763,7 +863,7 @@ FRONTEND_JS_TEMPLATE = r"""
             const finalQ = __STREAM_Q__;
 
             const _selMdl = (document.getElementById('sxng-model-select') || {value: ''}).value;
-            const bodyObj = { q: finalQ, lang: lang_init, context: ctx, tk: tk_init, model: _selMdl__STREAM_BODY__ };
+            const bodyObj = { q: finalQ, lang: lang_init, context: ctx, tk: tk_init, model: _selMdl, session_id: session_id_init__STREAM_BODY__ };
             const res = await fetch(script_root + '/ai-stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -950,6 +1050,7 @@ FRONTEND_JS_TEMPLATE = r"""
 
             if (collectedResponse) {
                 conversation.turns.push({role: 'assistant', content: collectedResponse.trim(), ts: Date.now()});
+                await saveConversationTurn();
             }
 
             if (arguments.length === 0 && typeof updateState === 'function') {
@@ -977,6 +1078,7 @@ FRONTEND_JS_TEMPLATE = r"""
         }
     }
 
+    await loadPriorConversation();
     if (!restored) startStream();
 })();
 """
@@ -1211,14 +1313,14 @@ class SXNGPlugin(Plugin):
 
             return jsonify({'models': [self.model] if self.model else []})
 
-        @app.route('/ai-stream', methods=['POST'])
-        def handle_ai_stream():
-            data = request.json or {}
-            
-            token = data.get('tk', '')
-            q = data.get('q', '')
-            lang = data.get('lang', 'all')
-            
+        @app.route('/ai-conversation', methods=['GET', 'POST', 'DELETE'])
+        def ai_conversation():
+            if request.method == 'GET':
+                token = request.args.get('tk', '')
+            else:
+                body = request.json or {}
+                token = body.get('tk', '')
+
             try:
                 ts, sig = token.rsplit('.', 1)
                 expected = hashlib.sha256(f"{ts}{self.secret}".encode()).hexdigest()
@@ -1226,6 +1328,61 @@ class SXNGPlugin(Plugin):
                     abort(403)
             except (ValueError, KeyError, AttributeError):
                 abort(403)
+
+            if request.method == 'GET':
+                session_id = request.args.get('session_id', '')
+                if not session_id:
+                    return jsonify({'turns': []})
+                turns = _load_conversation(session_id)
+                return jsonify({'turns': turns[-10:]})
+
+            elif request.method == 'POST':
+                body = request.json or {}
+                session_id = body.get('session_id', '')
+                turns = body.get('turns', [])
+                if session_id:
+                    _save_conversation(session_id, turns)
+                return jsonify({'ok': True})
+
+            else:  # DELETE
+                body = request.json or {}
+                session_id = body.get('session_id', '')
+                if session_id:
+                    try:
+                        v = _get_valkey()
+                        v.delete(f"ai:conv:{session_id}")
+                    except Exception as e:
+                        logger.debug(f"{PLUGIN_NAME}: conv delete failed: {e}")
+                return jsonify({'ok': True})
+
+        @app.route('/ai-stream', methods=['POST'])
+        def handle_ai_stream():
+            data = request.json or {}
+
+            token = data.get('tk', '')
+            q = data.get('q', '')
+            lang = data.get('lang', 'all')
+
+            try:
+                ts, sig = token.rsplit('.', 1)
+                expected = hashlib.sha256(f"{ts}{self.secret}".encode()).hexdigest()
+                if sig != expected or (time.time() - float(ts)) > TOKEN_EXPIRY_SEC:
+                    abort(403)
+            except (ValueError, KeyError, AttributeError):
+                abort(403)
+
+            session_id = data.get('session_id', '')
+            prior_conv = _load_conversation(session_id) if session_id else []
+
+            if prior_conv:
+                history_lines = []
+                for turn in prior_conv[-6:]:
+                    role = 'User' if turn.get('role') == 'user' else 'Assistant'
+                    content = turn.get('content', '')[:500]
+                    history_lines.append(f"{role}: {content}")
+                cross_search_history = '\n'.join(history_lines)
+            else:
+                cross_search_history = ''
 
             context_text = data.get('context', '')
             prev_answer = (data.get('prev_answer') or '')[-4000:]
@@ -1291,6 +1448,10 @@ class SXNGPlugin(Plugin):
 {prev_answer or 'None.'}
 </HISTORY>
 
+<PRIOR_CONVERSATION>
+{cross_search_history or 'None.'}
+</PRIOR_CONVERSATION>
+
 <USER_QUERY>{q}</USER_QUERY>
 
 <CORE_DIRECTIVES>
@@ -1329,6 +1490,11 @@ class SXNGPlugin(Plugin):
                 daemon=True,
             )
             t.start()
+
+            if session_id:
+                turns = _load_conversation(session_id)
+                turns.append({'role': 'user', 'content': q, 'ts': int(time.time())})
+                _save_conversation(session_id, turns)
 
             return jsonify({"job_id": job_id})
 
@@ -1593,9 +1759,16 @@ class SXNGPlugin(Plugin):
             lang = search.search_query.lang
             sig = hashlib.sha256(f"{ts}{self.secret}".encode()).hexdigest()
             tk = f"{ts}.{sig}"
-            
+
             # XSS blocking
             safe_json = lambda x: json.dumps(x).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+
+            session_id = request.cookies.get('sxng_ai_session')
+            if not session_id:
+                session_id = hashlib.sha256(
+                    f"{time.time()}{os.urandom(16).hex()}".encode()
+                ).hexdigest()[:24]
+            js_session_id = safe_json(session_id)
             
             b64_context = base64.b64encode(context_str.encode('utf-8')).decode('utf-8')
             total_context_count = self.context_deep_count + self.context_shallow_count
@@ -1622,13 +1795,14 @@ class SXNGPlugin(Plugin):
                 interactive_js_complete = ''
             stream_fn_sig = 'async function startStream(overrideQ = null, prevAnswer = null, auxContext = null)'
             stream_q = 'overrideQ || q_init' if is_interactive else 'q_init'
-            stream_body = f'''prev_answer: prevAnswer''' if is_interactive else ''
-            
+            stream_body = 'prev_answer: prevAnswer' if is_interactive else ''
+
             js_code = FRONTEND_JS_TEMPLATE \
                 .replace("__IS_INTERACTIVE__", 'true' if is_interactive else 'false') \
                 .replace("__TK__", js_tk) \
                 .replace("__SCRIPT_ROOT__", js_script_root) \
                 .replace("__MODEL_INIT__", js_model_init) \
+                .replace("__SESSION_ID__", js_session_id) \
                 .replace("__CITATION_HELPER_JS__", CITATION_HELPER_JS) \
                 .replace("__INTERACTIVE_JS_INIT__", interactive_js_init) \
                 .replace("__STREAM_FN_SIG__", stream_fn_sig) \
