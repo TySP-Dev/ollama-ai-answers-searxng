@@ -103,8 +103,6 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
         else:
             raise RuntimeError("Too many redirects to Ollama endpoint")
 
-        logger.error(f"AI Answers: Ollama response status: {res.status}")
-
         if res.status != 200:
             body = res.read(1024).decode('utf-8', errors='replace')
             raise RuntimeError(f"Ollama error {res.status}: {body[:200]}")
@@ -112,16 +110,12 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
         think_depth = 0
         pending = ''
         chunk_count = 0
-        line_count = 0
 
         while True:
             raw_line = res.readline()
             if not raw_line:
                 break
             line = raw_line.decode('utf-8', errors='replace').rstrip('\r\n')
-            if line_count < 20:
-                logger.error(f"AI Answers: raw line [{line_count}]: {repr(line)}")
-            line_count += 1
             if not line or not line.startswith('data: '):
                 continue
             data_str = line[6:]
@@ -129,18 +123,19 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
                 break
             try:
                 obj = json.loads(data_str)
-            except (json.JSONDecodeError, ValueError) as parse_err:
-                logger.error(f"AI Answers: JSON parse error on line {line_count}: {parse_err!r}, data={repr(data_str[:100])}", exc_info=True)
+            except (json.JSONDecodeError, ValueError):
                 continue
             choices = obj.get('choices', [])
             if not choices:
                 continue
             delta = choices[0].get('delta', {})
-            token = delta.get('content') or ''
-            if not token:
+            text = delta.get('content') or ''
+            reasoning = delta.get('reasoning') or ''
+            chunk = text if text else reasoning
+            if not chunk:
                 continue
 
-            pending += token
+            pending += chunk
             # Filter <think>...</think> blocks, push clean content immediately
             while True:
                 if think_depth == 0:
@@ -173,7 +168,7 @@ def stream_to_valkey(job_id: str, payload: str, headers: dict, endpoint_url: str
             vk.expire(chunks_key, 120)
             chunk_count += 1
 
-        logger.error(f"AI Answers: stream complete, wrote {chunk_count} chunks, saw {line_count} lines")
+        logger.debug(f"AI Answers: stream complete, wrote {chunk_count} chunks")
         vk.rpush(chunks_key, '__DONE__')
         vk.expire(chunks_key, 120)
         vk.set(status_key, 'done', ex=120)
