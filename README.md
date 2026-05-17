@@ -102,6 +102,16 @@ Configure via environment variables.
 6. Client-side script calls a signed endpoint (`/ai-stream`)
 7. Ollama streams a response token-by-token in the UI
 
+## Known Issues
+
+[ ] When asking a follow up question the previous output disappear
+
+For any issues not stated here please create an issue ticket on [Gitea](https://git.tysstech.com/TySS-Dev/ollama-ai-answers-searxng/issues) or [GitHub](https://github.com/TySP-Dev/ollama-ai-answers-searxng/issues) and add the `bug` tag.
+
+## Roadmap
+
+[ ] Working on feature plans
+
 ## Architecture
 
 ```
