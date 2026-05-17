@@ -408,6 +408,22 @@ INTERACTIVE_CSS = '''
                             padding-left: 0.5rem;
                             color: var(--color-base-font, #cdd6f4);
                         }
+                        .sxng-md-content {
+                            line-height: 1.6;
+                        }
+                        .sxng-md-content ul, .sxng-md-content ol {
+                            margin: 0.5rem 0;
+                            padding-left: 1.5rem;
+                        }
+                        .sxng-md-content li {
+                            margin: 0.2rem 0;
+                        }
+                        .sxng-md-content p {
+                            margin: 0.4rem 0;
+                        }
+                        .sxng-md-content code {
+                            font-family: monospace;
+                        }
 '''
 
 INTERACTIVE_HTML = '''
@@ -430,6 +446,62 @@ INTERACTIVE_HTML = '''
 '''
 
 CITATION_HELPER_JS = r'''
+                        function parseMarkdown(text) {
+                            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                            text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
+                            text = text.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+                            text = text.replace(/(?<!_)_(?!_)(.*?)(?<!_)_(?!_)/g, '<em>$1</em>');
+                            text = text.replace(/`([^`]+)`/g, '<code style="background:var(--color-sidebar-bg,#2a2a2e);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:0.9em;">$1</code>');
+                            text = text.replace(/((?:^|\n)[*\-+] .+)+/g, (match) => {
+                                const items = match.trim().split('\n').map(line => {
+                                    const content = line.replace(/^[*\-+] /, '').trim();
+                                    return `<li>${content}</li>`;
+                                }).join('');
+                                return `<ul style="margin:0.5rem 0;padding-left:1.5rem;">${items}</ul>`;
+                            });
+                            text = text.replace(/((?:^|\n)\d+\. .+)+/g, (match) => {
+                                const items = match.trim().split('\n').map(line => {
+                                    const content = line.replace(/^\d+\. /, '').trim();
+                                    return `<li>${content}</li>`;
+                                }).join('');
+                                return `<ol style="margin:0.5rem 0;padding-left:1.5rem;">${items}</ol>`;
+                            });
+                            text = text.replace(/^### (.+)$/gm, '<h4 style="margin:0.5rem 0 0.25rem;font-size:0.95em;font-weight:700;">$1</h4>');
+                            text = text.replace(/^## (.+)$/gm, '<h3 style="margin:0.5rem 0 0.25rem;font-size:1em;font-weight:700;">$1</h3>');
+                            text = text.replace(/^# (.+)$/gm, '<h3 style="margin:0.5rem 0 0.25rem;font-size:1.05em;font-weight:700;">$1</h3>');
+                            text = text.replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid var(--color-sidebar-bg,#424247);margin:0.5rem 0;">');
+                            text = text.replace(/\n\n/g, '</p><p style="margin:0.4rem 0;">');
+                            text = text.replace(/\n(?!<)/g, '<br>');
+                            return text;
+                        }
+
+                        function linkCitationsInElement(el, urls) {
+                            const walker = document.createTreeWalker(
+                                el, NodeFilter.SHOW_TEXT, null
+                            );
+                            const textNodes = [];
+                            let node;
+                            while (node = walker.nextNode()) {
+                                textNodes.push(node);
+                            }
+                            textNodes.forEach(textNode => {
+                                const text = textNode.textContent;
+                                if (!/\[\d/.test(text)) return;
+                                const span = document.createElement('span');
+                                span.innerHTML = text.replace(/\[(\d{1,2}(?:,\s*\d{1,2})*)\]/g, (match, nums) => {
+                                    return nums.split(/\s*,\s*/).map(n => {
+                                        const idx = parseInt(n.trim());
+                                        const url = urls[idx - 1];
+                                        if (url) {
+                                            return `<a href="${url}" target="_blank" style="text-decoration:none;color:var(--color-result-link);font-weight:bold;">[${n.trim()}]</a>`;
+                                        }
+                                        return match;
+                                    }).join('');
+                                });
+                                textNode.parentNode.replaceChild(span, textNode);
+                            });
+                        }
+
                         function renderCitations(text, urls) {
                             const fragment = document.createDocumentFragment();
                             const re = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
@@ -1039,17 +1111,19 @@ FRONTEND_JS_TEMPLATE = r"""
 
             if (cursor) cursor.remove();
 
-            let last = data.lastChild;
-            while (last) {
-                if (last.textContent && last.textContent.trim().length === 0) {
-                    const prev = last.previousSibling;
-                    last.remove();
-                    last = prev;
-                } else {
-                    if (last.textContent) last.textContent = last.textContent.trimEnd();
-                    break;
+            // Replace streamed text nodes with markdown-rendered content
+            Array.from(data.childNodes).forEach(node => {
+                if (node.nodeType !== 1 || !node.classList.contains('sxng-prior-history')) {
+                    node.remove();
                 }
-            }
+            });
+
+            const rendered = parseMarkdown(fullText.trim());
+            const mdDiv = document.createElement('div');
+            mdDiv.className = 'sxng-md-content';
+            mdDiv.innerHTML = rendered;
+            linkCitationsInElement(mdDiv, urls);
+            data.appendChild(mdDiv);
 
             renderCitationFooter(fullText, urls, data);
 
@@ -1546,6 +1620,7 @@ class SXNGPlugin(Plugin):
                 "Answer the question directly using the provided context.",
                 "MUST CITE SOURCES by tailing a sentence with [n] or [n,n] etc. If citing general knowledge, use [*].",
                 "Never explain your process. The user expects a direct response.",
+                "Use markdown formatting where it improves clarity: **bold** for key terms, bullet lists for enumerations, numbered lists for steps. Keep formatting minimal and purposeful.",
                 intent_cfg['format'],
                 "If sources and general knowledge are insufficient, respond with 'Insufficient information to answer.'"
             ]
