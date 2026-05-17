@@ -201,7 +201,6 @@ INTERACTIVE_HTML = '''
                         <form id="sxng-action-form" class="sxng-input-wrapper" onsubmit="event.preventDefault();">
                             <input type="text" id="sxng-action-input" class="sxng-input" placeholder="Ask..." aria-label="Ask follow-up" autocomplete="off">
                             <div class="sxng-input-line"></div>
-                                <svg viewBox="0 0 24 24"><path d="M19,7V11H5.83L9.41,7.41L8,6L2,12L8,18L9.41,16.59L5.83,13H21V7H19Z"/></svg>
                             </button>
                         </form>
                     </div>
