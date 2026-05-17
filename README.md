@@ -111,35 +111,35 @@ Configure via environment variables.
 └────────────────┬────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────┐
-│              SearXNG + Plugin                        │
-│                                                      │
-│  post_search()                                       │
+│              SearXNG + Plugin                       │
+│                                                     │
+│  post_search()                                      │
 │    → _enrich_results()  ← ThreadPoolExecutor        │
 │      → _fetch_page_text() × 5 parallel              │
 │      → _chunk_text() + _tfidf_score()               │
 │      → rerank by score                              │
 │    → _assemble_context()                            │
 │    → inject AI Overview HTML + JS                   │
-│                                                      │
-│  /ai-stream                                          │
-│    → validate token                                  │
+│                                                     │
+│  /ai-stream                                         │
+│    → validate token                                 │
 │    → _detect_intent() → select system prompt        │
 │    → _load_conversation() from Valkey               │
 │    → launch stream_to_valkey() thread               │
 │    → return {job_id} immediately                    │
-│                                                      │
+│                                                     │
 │  stream_to_valkey() [background thread]             │
 │    → Ollama stream=True                             │
 │    → RPUSH tokens to Valkey                         │
 │    → RPUSH __DONE__ when complete                   │
-│                                                      │
+│                                                     │
 │  /ai-status/{job_id}                                │
 │    → LRANGE chunks from offset                      │
 │    → return {chunks, done}                          │
 └────────────────┬────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────┐
-│                  Valkey                              │
+│                  Valkey                             │
 │  ai:job:{id}:chunks  (list, TTL 120s)               │
 │  ai:job:{id}:status  (string, TTL 120s)             │
 │  ai:conv:{session}   (JSON, TTL 1800s)              │
