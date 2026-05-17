@@ -147,7 +147,7 @@ INTERACTIVE_CSS = '''
                             border-color: transparent;
                             border-radius: 5px;
                             outline: none;
-                            height: 32px;
+                            height: 25px;
                             color: var(--color-search-url, #bbb);
                             font-size: .9rem;
                             padding: 1px 10px 1px 10px !important;
