@@ -1,4 +1,5 @@
-import json, os, logging, base64, time, hashlib, re, http.client, ssl, concurrent.futures, threading
+import json, os, logging, base64, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
+from collections import Counter
 from urllib.parse import urlparse
 from searx import network
 try:
@@ -53,6 +54,44 @@ def _get_streaming_connection(url: str, verify_ssl: bool = True):
         conn = http.client.HTTPConnection(host, port, timeout=STREAM_TIMEOUT_SEC)
 
     return conn, path
+
+
+def _tokenize(text: str) -> list:
+    text = text.lower()
+    text = re.sub(r'[^\w\s]', ' ', text)
+    return [t for t in text.split() if len(t) > 2]
+
+
+def _tfidf_score(query_tokens: list, doc_tokens: list) -> float:
+    if not doc_tokens or not query_tokens:
+        return 0.0
+    doc_len = len(doc_tokens)
+    doc_counter = Counter(doc_tokens)
+    k1 = 1.5
+    b = 0.75
+    avg_len = 150
+    score = 0.0
+    for qt in query_tokens:
+        tf = doc_counter.get(qt, 0) / doc_len
+        idf = 1.0 / (1.0 + doc_counter.get(qt, 0) / max(doc_len, 1))
+        tf_bm25 = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * doc_len / avg_len))
+        score += tf_bm25 * math.log(1 + idf)
+    return score
+
+
+def _chunk_text(text: str, chunk_size: int = 512, overlap: int = 64) -> list:
+    tokens = _tokenize(text)
+    if len(tokens) <= chunk_size:
+        return [text]
+    chunks = []
+    start = 0
+    while start < len(tokens):
+        end = min(start + chunk_size, len(tokens))
+        chunks.append(' '.join(tokens[start:end]))
+        if end >= len(tokens):
+            break
+        start += chunk_size - overlap
+    return chunks
 
 
 _VALKEY_POOL = None
@@ -1378,7 +1417,7 @@ class SXNGPlugin(Plugin):
                     if res.status != 200:
                         return ''
 
-                    html = res.read(512 * 1024).decode('utf-8', errors='replace')
+                    html = res.read(256 * 1024).decode('utf-8', errors='replace')
                 finally:
                     conn.close()
 
@@ -1393,55 +1432,70 @@ class SXNGPlugin(Plugin):
                 text = re.sub(r'\s+', ' ', text).strip()
 
                 logger.debug(f"{PLUGIN_NAME}: fetched {len(text)} chars from {url}")
-                return text[:2000]
+                return text[:6000]
 
             return ''
         except Exception:
             return ''
 
     def _enrich_results(self, clean_results: list, query: str) -> list:
-        enrich_count = min(3, self.context_deep_count)
+        query_tokens = _tokenize(query)
+        enrich_count = min(5, self.context_deep_count + 2)
+
         for r in clean_results:
             r['fetched_content'] = ''
+            r['relevance_score'] = 0.0
 
         futures_map: dict = {}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for r in clean_results[:enrich_count]:
                 futures_map[executor.submit(self._fetch_page_text, r.get('url', ''))] = r
 
             for future, r in futures_map.items():
                 try:
-                    text = future.result(timeout=6)
-                    if text and len(text) > 100:
-                        words = query.lower().split()
-                        text_lower = text.lower()
-                        best_pos = len(text) // 2
-                        best_count = -1
+                    text = future.result(timeout=4)
+                    if not text or len(text) < 100:
+                        snippet = r.get('content', '')
+                        if snippet:
+                            r['relevance_score'] = _tfidf_score(query_tokens, _tokenize(snippet))
+                        continue
 
-                        keyword_positions = []
-                        for word in words:
-                            start = 0
-                            while True:
-                                idx = text_lower.find(word, start)
-                                if idx == -1:
-                                    break
-                                keyword_positions.append(idx)
-                                start = idx + 1
+                    chunks = _chunk_text(text, chunk_size=512, overlap=64)
+                    best_chunk = ''
+                    best_score = -1.0
+                    for chunk in chunks:
+                        score = _tfidf_score(query_tokens, _tokenize(chunk))
+                        if score > best_score:
+                            best_score = score
+                            best_chunk = chunk
 
-                        for pos in (keyword_positions or [best_pos]):
-                            window_start = max(0, pos - 400)
-                            window_end = min(len(text), pos + 400)
-                            count = sum(w in text_lower[window_start:window_end] for w in words)
-                            if count > best_count:
-                                best_count = count
-                                best_pos = pos
+                    r['fetched_content'] = best_chunk[:800]
+                    r['relevance_score'] = best_score
+                    logger.debug(
+                        f"{PLUGIN_NAME}: [{r.get('url', '')}] "
+                        f"score={best_score:.4f} chunks={len(chunks)}"
+                    )
+                except Exception as e:
+                    logger.debug(f"{PLUGIN_NAME}: enrich failed for {r.get('url', '')}: {e}")
 
-                        start = max(0, best_pos - 400)
-                        r['fetched_content'] = text[start:start + 800]
-                except Exception:
-                    pass
+        enriched = [r for r in clean_results[:enrich_count] if r.get('relevance_score', 0) > 0]
+        not_enriched = clean_results[enrich_count:]
+        enriched.sort(key=lambda r: r['relevance_score'], reverse=True)
+        reranked = enriched + not_enriched
 
-        return clean_results
+        seen_urls = {r.get('url') for r in reranked}
+        for r in clean_results:
+            if r.get('url') not in seen_urls:
+                reranked.append(r)
+                seen_urls.add(r.get('url'))
+
+        if enriched:
+            logger.debug(
+                f"{PLUGIN_NAME}: reranked {len(enriched)} results, "
+                f"top score={enriched[0]['relevance_score']:.4f}"
+            )
+
+        return reranked
 
     def _assemble_context(self, clean_results, infoboxes, answers, offset=0) -> tuple[str, list]:
         """Builds context string from normalized search data. Returns (context_str, urls)."""
