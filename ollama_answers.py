@@ -781,6 +781,7 @@ FRONTEND_JS_TEMPLATE = r"""
     const script_root = __SCRIPT_ROOT__;
     const model_init = __MODEL_INIT__;
     const session_id_init = __SESSION_ID__;
+    const intent_init = __INTENT__;
     if (session_id_init && !document.cookie.includes('sxng_ai_session')) {
         document.cookie = `sxng_ai_session=${session_id_init}; path=/; max-age=1800; SameSite=Lax`;
     }
@@ -798,6 +799,14 @@ FRONTEND_JS_TEMPLATE = r"""
     let isStreaming = false;
     
     __CITATION_HELPER_JS__
+
+    (function applyIntentBadge() {
+        const intentEmoji = {factual:'📖',howto:'🔧',technical:'⌨️',comparison:'⚖️',opinion:'💬',current:'📰',local:'📍'}[intent_init] || '';
+        if (intentEmoji) {
+            const label = box ? box.querySelector('.sxng-ai-label') : null;
+            if (label) label.innerHTML += ` <span style="font-size:0.8em;opacity:0.7;">${intentEmoji}</span>`;
+        }
+    })();
 
     __INTERACTIVE_JS_INIT__
 
@@ -1082,6 +1091,122 @@ FRONTEND_JS_TEMPLATE = r"""
     if (!restored) startStream();
 })();
 """
+
+def _detect_intent(query: str) -> str:
+    q = query.lower().strip()
+
+    if any(w in q for w in ['news', 'latest', 'recent', 'today', 'yesterday',
+                              'this week', 'breaking', '2025', '2026', 'update']):
+        return 'current'
+
+    if any(q.startswith(p) for p in ['how to', 'how do i', 'how can i',
+                                       'how do you', 'steps to', 'guide to',
+                                       'tutorial', 'how does']):
+        return 'howto'
+    if any(w in q for w in ['install', 'configure', 'setup', 'set up',
+                              'enable', 'disable', 'fix', 'repair']):
+        return 'howto'
+
+    if any(w in q for w in ['error', 'exception', 'traceback', 'debug',
+                              'code', 'function', 'script', 'api', 'command',
+                              'terminal', 'bash', 'python', 'javascript',
+                              'docker', 'linux', 'git', 'sql', 'regex']):
+        return 'technical'
+
+    if ' vs ' in q or ' versus ' in q or 'difference between' in q or \
+       'compare ' in q or (' or ' in q and len(q.split()) < 8):
+        return 'comparison'
+
+    if any(q.startswith(p) for p in ['best ', 'top ', 'worst ', 'should i',
+                                       'is it worth', 'recommend']):
+        return 'opinion'
+    if any(w in q for w in ['worth it', 'better than', 'best way',
+                              'recommend', 'suggestion', 'advice']):
+        return 'opinion'
+
+    if any(w in q for w in ['near me', 'nearby', 'local', 'in my area',
+                              'closest', 'directions to']):
+        return 'local'
+
+    if any(q.startswith(p) for p in ['what is', 'what are', 'who is',
+                                       'who was', 'when did', 'when was',
+                                       'where is', 'where was', 'why is',
+                                       'why does', 'define ', 'what does']):
+        return 'factual'
+
+    return 'general'
+
+
+INTENT_CONFIGS = {
+    'factual': {
+        'system_suffix': (
+            "This is a factual question. Provide a direct, accurate definition "
+            "or explanation. Lead with the core fact. Cite your primary source. "
+            "2-3 sentences maximum."
+        ),
+        'task': "DEFINE: State the fact or definition directly. No preamble.",
+        'format': "Plain prose. No lists. Cite the most authoritative source first."
+    },
+    'howto': {
+        'system_suffix': (
+            "This is a how-to question. Provide clear, actionable steps. "
+            "Be specific and practical. Number the key steps if there are more than 2."
+        ),
+        'task': "INSTRUCT: Give the key steps or method directly. Be actionable.",
+        'format': "Numbered steps if 3+, otherwise prose. Cite sources for each step."
+    },
+    'technical': {
+        'system_suffix': (
+            "This is a technical question. Be precise and specific. "
+            "Include exact commands, syntax, or error explanations where relevant. "
+            "Prioritize official documentation and technical sources."
+        ),
+        'task': "TECHNICAL: Provide the precise technical answer. Include specifics.",
+        'format': "Exact terminology. Commands in backticks if applicable. Cite docs."
+    },
+    'comparison': {
+        'system_suffix': (
+            "This is a comparison question. Objectively compare the options. "
+            "Highlight key differences. Avoid picking a winner unless sources clearly support it."
+        ),
+        'task': "COMPARE: State the key differences between the options directly.",
+        'format': "Brief parallel structure. Cite a source for each side if available."
+    },
+    'opinion': {
+        'system_suffix': (
+            "This is a recommendation or opinion question. Synthesize what sources say. "
+            "Present the consensus view if one exists. Note disagreement if present. "
+            "Do not present personal opinions as fact."
+        ),
+        'task': "SYNTHESIZE: State what sources recommend or what consensus says.",
+        'format': "Lead with the consensus. Note any caveats. Cite sources."
+    },
+    'current': {
+        'system_suffix': (
+            "This is a current events question. Prioritize the most recent sources. "
+            "Note the date of information if relevant. Be clear about what is known vs uncertain."
+        ),
+        'task': "REPORT: State the latest known information directly. Note recency.",
+        'format': "Lead with most recent fact. Include dates where available. Cite news sources."
+    },
+    'local': {
+        'system_suffix': (
+            "This is a local or location-based question. "
+            "Provide relevant location-specific information from sources. "
+            "Note if information may vary by location."
+        ),
+        'task': "LOCAL: Provide location-relevant information from sources.",
+        'format': "Be specific to the location context. Cite local sources."
+    },
+    'general': {
+        'system_suffix': (
+            "Provide a concise, accurate overview that directly answers the query."
+        ),
+        'task': "ANSWER FIRST: Lead with the direct answer. No preamble.",
+        'format': "2-4 sentences. Cite most relevant sources."
+    },
+}
+
 
 import typing
 if typing.TYPE_CHECKING:
@@ -1395,18 +1520,22 @@ class SXNGPlugin(Plugin):
 
             if not self.api_key:
                 return Response("Missing API key or query", status=400)
-            
+
+            intent = _detect_intent(q)
+            intent_cfg = INTENT_CONFIGS.get(intent, INTENT_CONFIGS['general'])
+            logger.debug(f"{PLUGIN_NAME}: detected intent '{intent}' for query: {q[:50]}")
+
             today = time.strftime("%Y-%m-%d")
             lang_instruction = f" Respond in {lang}." if lang not in ('all', 'auto') else ""
 
-            base_sys = self.system_prompt if self.system_prompt else "You are a direct, citation-accurate search synthesis engine."
-            SYSTEM = (f"{base_sys} Today is {today}.{lang_instruction} "
-                      "Output only your final answer. Do not output your thinking process, "
-                      "reasoning steps, or internal monologue. Begin your response with the "
-                      "direct answer immediately. "
-                      "Be concise. Give a 2-4 sentence overview that directly answers the query. "
-                      "The user can ask follow-up questions for more detail. "
-                      "Do not enumerate or list everything from the sources.")
+            base_sys = self.system_prompt if self.system_prompt else \
+                "You are a direct, citation-accurate search synthesis engine."
+            SYSTEM = (
+                f"{base_sys} Today is {today}.{lang_instruction} "
+                "Output only your final answer. Do not output your thinking process, "
+                "reasoning steps, or internal monologue. Begin your response with the "
+                f"direct answer immediately. {intent_cfg['system_suffix']}"
+            )
             max_source_idx = 0
             if context_text:
                 indices = re.findall(r'\[(\d+)\]', context_text)
@@ -1417,9 +1546,7 @@ class SXNGPlugin(Plugin):
                 "Answer the question directly using the provided context.",
                 "MUST CITE SOURCES by tailing a sentence with [n] or [n,n] etc. If citing general knowledge, use [*].",
                 "Never explain your process. The user expects a direct response.",
-                "Response format must be plain text with no markdown. "
-                "Be brief: 2-4 sentences maximum. Lead with the direct answer. "
-                "Cite the most relevant source(s) only. Stop after the overview.",
+                intent_cfg['format'],
                 "If sources and general knowledge are insufficient, respond with 'Insufficient information to answer.'"
             ]
 
@@ -1428,7 +1555,7 @@ class SXNGPlugin(Plugin):
             elif prev_answer:
                 task = "FOLLOW-UP: Address the new question using prior context. Prioritize the new query."
             else:
-                task = "ANSWER FIRST: Lead with the direct answer. No preamble, no context-setting."
+                task = intent_cfg['task']
 
             grounding = "GROUNDING: KNOWLEDGE GRAPH > DEEP > SHALLOW." if context_text else "GROUNDING: No sources available. Use general knowledge and cite as [*] which means based on general knowledge."
             history_rule = "HISTORY: Refer to prior exchange for context. Ideally, do not repeat any claims." if prev_answer else None
@@ -1769,6 +1896,9 @@ class SXNGPlugin(Plugin):
                     f"{time.time()}{os.urandom(16).hex()}".encode()
                 ).hexdigest()[:24]
             js_session_id = safe_json(session_id)
+
+            detected_intent = _detect_intent(q_clean)
+            js_intent = safe_json(detected_intent)
             
             b64_context = base64.b64encode(context_str.encode('utf-8')).decode('utf-8')
             total_context_count = self.context_deep_count + self.context_shallow_count
@@ -1803,6 +1933,7 @@ class SXNGPlugin(Plugin):
                 .replace("__SCRIPT_ROOT__", js_script_root) \
                 .replace("__MODEL_INIT__", js_model_init) \
                 .replace("__SESSION_ID__", js_session_id) \
+                .replace("__INTENT__", js_intent) \
                 .replace("__CITATION_HELPER_JS__", CITATION_HELPER_JS) \
                 .replace("__INTERACTIVE_JS_INIT__", interactive_js_init) \
                 .replace("__STREAM_FN_SIG__", stream_fn_sig) \
