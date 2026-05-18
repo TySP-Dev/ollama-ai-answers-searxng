@@ -705,7 +705,18 @@ INTERACTIVE_JS = r'''
                         };
 
                         document.getElementById('btn-regen').onclick = async () => {
-                            data.innerHTML = '<span class="sxng-cursor"></span>';
+                            // Remove only the last assistant response and its citation footer
+                            const lastMd = [...data.querySelectorAll('.sxng-md-content')].pop();
+                            if (lastMd) {
+                                const nextSib = lastMd.nextElementSibling;
+                                if (nextSib && nextSib.classList.contains('sxng-citation-footer')) nextSib.remove();
+                                lastMd.remove();
+                            }
+                            const existingCursor = data.querySelector('.sxng-cursor');
+                            if (existingCursor) existingCursor.remove();
+                            const regenCursor = document.createElement('span');
+                            regenCursor.className = 'sxng-cursor';
+                            data.appendChild(regenCursor);
                             footer.style.display = 'none';
 
                             if (conversation.turns.length > 0 && conversation.turns[conversation.turns.length - 1].role === 'assistant') {
@@ -1111,12 +1122,8 @@ FRONTEND_JS_TEMPLATE = r"""
 
             if (cursor) cursor.remove();
 
-            // Replace streamed text nodes with markdown-rendered content
-            Array.from(data.childNodes).forEach(node => {
-                if (node.nodeType !== 1 || !node.classList.contains('sxng-prior-history')) {
-                    node.remove();
-                }
-            });
+            // Remove only the streamed chunk spans added during this stream
+            Array.from(data.querySelectorAll('.sxng-chunk')).forEach(node => node.remove());
 
             const rendered = parseMarkdown(fullText.trim());
             const mdDiv = document.createElement('div');
