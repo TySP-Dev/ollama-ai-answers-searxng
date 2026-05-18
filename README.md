@@ -104,7 +104,7 @@ Configure via environment variables.
 
 ## Known Issues
 
-- [ ] When asking a follow up question the previous output disappear
+- [ ] When asking a follow up question the previous output disappears
 
 For any issues not stated here please create an issue ticket on [Gitea](https://git.tysstech.com/TySS-Dev/ollama-ai-answers-searxng/issues) or [GitHub](https://github.com/TySP-Dev/ollama-ai-answers-searxng/issues) and add the `bug` tag.
 
