@@ -105,6 +105,8 @@ Configure via environment variables.
 ## Known Issues
 
 - [ ] When asking a follow up question the previous output disappears
+- [ ] Parts of the UI are not theme aware resulting in a unpolished look when not using a dark theme
+- [ ] When SearXNG provides a info blob for a search it appears on top of the overview i.e. `Wikipedia` or `Linux` 
 
 For any issues not stated here please create an issue ticket on [Gitea](https://git.tysstech.com/TySS-Dev/ollama-ai-answers-searxng/issues) or [GitHub](https://github.com/TySP-Dev/ollama-ai-answers-searxng/issues) and add the `bug` tag.
 
