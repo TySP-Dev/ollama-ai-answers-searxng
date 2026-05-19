@@ -1,12 +1,11 @@
-import json, os, logging, base64, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
+import json, os, logging, base64, typing, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
 from collections import Counter
 from urllib.parse import urlparse
-from searx import network
 try:
     from searx.network import get_network
 except ImportError:
     get_network = None
-from flask import Response, request, abort, jsonify
+from flask import request, abort, jsonify
 from searx.plugins import Plugin, PluginInfo
 from searx.result_types import EngineResults
 from searx import settings
@@ -24,7 +23,6 @@ except ImportError:
     logger.warning("AI Answers: valkey package not found. Streaming via Valkey unavailable.")
 
 TOKEN_EXPIRY_SEC = 3600
-STREAM_CHUNK_SIZE = 512
 STREAM_TIMEOUT_SEC = 60
 CONV_TTL = 1800
 
@@ -276,17 +274,17 @@ INTERACTIVE_CSS = '''
                             width: 32px;
                             height: 32px;
                             padding: 0;
-                            border: none;
+                            border: 1px solid var(--color-result-border, rgba(0,0,0,0.1));
                             border-radius: 4px;
-                            background: var(--color-sidebar-bg, #424247);
-                            color: var(--color-search-url, #bbb);
+                            background: var(--color-base-background-hover, rgba(0,0,0,0.06));
+                            color: var(--color-base-font, inherit);
                             cursor: pointer;
                             vertical-align: middle;
                             line-height: 1.4;
                         }
                         .sxng-btn:hover {
-                            background: var(--color-search-url, #303033);
-                            color: var(--color-sidebar-bg, #bbb);
+                            background: var(--color-result-border, rgba(0,0,0,0.15));
+                            color: var(--color-base-font, inherit);
                         }
                         .sxng-btn svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-input-wrapper {
@@ -300,9 +298,9 @@ INTERACTIVE_CSS = '''
                         .sxng-input {
                             width: 100%;
                             height: -webkit-fill-available;
-                            background: var(--color-sidebar-bg, #424247);
-                            border: none;
-                            color: var(--color-base-font, #cdd6f4);
+                            background: var(--color-base-background-hover, rgba(0,0,0,0.06));
+                            border: 1px solid var(--color-result-border, rgba(0,0,0,0.15));
+                            color: var(--color-base-font, inherit);
                             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                             font-size: 0.78em;
                             padding: 3px 8px;
@@ -311,7 +309,7 @@ INTERACTIVE_CSS = '''
                             vertical-align: middle;
                         }
                         .sxng-input:focus { outline: none; }
-                        .sxng-input::placeholder { color: var(--color-base-font, #333); opacity: 0.35; }
+                        .sxng-input::placeholder { color: var(--color-base-font, inherit); opacity: 0.4; }
                         .sxng-input-line {
                             position: absolute;
                             bottom: 0;
@@ -335,23 +333,24 @@ INTERACTIVE_CSS = '''
                             opacity: 0.55;
                             animation: sxng-fade-in-up 0.3s ease-out forwards;
                         }
-                        .sxng-input-wrapper:focus-within { 
-                            opacity: 1; 
-                            color: var(--color-result-link, #5e81ac); 
+                        .sxng-input-wrapper:focus-within {
+                            opacity: 1;
+                            color: var(--color-result-link, #5e81ac);
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
                         .sxng-model-select {
                             appearance: none;
                             -webkit-appearance: none;
                             background: url("data:image/svg+xml;charset=UTF-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%3Cg%20fill%3D%22%23aaa%22%3E%0A%3Cpolygon%20points%3D%22128%2C192%20256%2C320%20384%2C192%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E") calc(100% + 2rem) / 1rem no-repeat content-box border-box;
-                            background-color: #424247;
+                            background-color: var(--color-base-background-hover, rgba(0,0,0,0.06));
                             text-overflow: ellipsis;
-                            border-width: 0 2rem 0 0;
-                            border-color: transparent;
+                            border: 0px solid var(--color-result-border, rgba(0,0,0,0.1));
+                            border-right-width: 2rem;
+                            border-right-color: transparent;
                             border-radius: 5px;
                             outline: none;
                             height: 25px;
-                            color: var(--color-search-url, #bbb);
+                            color: var(--color-base-font, inherit);
                             font-size: .9rem;
                             padding: 1px 10px 1px 10px !important;
                             margin: 0;
@@ -361,8 +360,7 @@ INTERACTIVE_CSS = '''
                             vertical-align: middle;
                         }
                         .sxng-model-select:hover {
-                            background-color: #303033;
-                            color: var(--color-search-url, #bbb);
+                            background-color: var(--color-result-border, rgba(0,0,0,0.15));
                         }
                         .sxng-reasoning {
                             margin: 0.5rem 0; padding: 0.5rem;
@@ -385,7 +383,8 @@ INTERACTIVE_CSS = '''
                             font-size: 0.75em;
                             color: var(--color-result-link, #5e81ac);
                             text-decoration: none;
-                            opacity: 0.75;
+                            opacity: 1;
+                            font-weight: 600;
                         }
                         .sxng-citation-item a:hover {
                             opacity: 1;
@@ -395,18 +394,18 @@ INTERACTIVE_CSS = '''
                             margin-bottom: 0.75rem;
                             padding: 0.5rem;
                             border-left: 2px solid var(--color-result-link, #5e81ac);
-                            opacity: 0.6;
+                            opacity: 0.85;
                             font-size: 0.85em;
                         }
                         .sxng-prior-history summary {
                             cursor: pointer;
                             color: var(--color-result-link, #5e81ac);
-                            font-weight: 600;
+                            font-weight: 700;
                         }
                         .sxng-prior-answer {
                             margin: 0.25rem 0;
                             padding-left: 0.5rem;
-                            color: var(--color-base-font, #cdd6f4);
+                            color: var(--color-base-font, inherit);
                         }
                         .sxng-md-content {
                             line-height: 1.6;
@@ -507,7 +506,7 @@ CITATION_HELPER_JS = r'''
                             const re = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
                             let lastIdx = 0;
                             const matches = [...text.matchAll(re)];
-                            
+
                             matches.forEach(match => {
                                 if (match.index > lastIdx) {
                                     const s = document.createElement('span');
@@ -542,7 +541,7 @@ CITATION_HELPER_JS = r'''
                                 });
                                 lastIdx = match.index + match[0].length;
                             });
-                            
+
                             if (lastIdx < text.length) {
                                 const s = document.createElement('span');
                                 s.className = 'sxng-chunk';
@@ -600,23 +599,6 @@ INTERACTIVE_JS = r'''
                                 _ms.appendChild(_o);
                             }
                         }
-                        if (window.getComputedStyle && box) {
-                            try {
-                                const docStyles = getComputedStyle(document.documentElement);
-                                let accent = docStyles.getPropertyValue('--color-result-link').trim();
-                                if (!accent) {
-                                    const a = document.createElement('a');
-                                    document.body.appendChild(a);
-                                    accent = getComputedStyle(a).color;
-                                    document.body.removeChild(a);
-                                }
-                                if (accent) {
-                                    box.style.setProperty('--color-result-link', accent);
-                                    box.style.setProperty('--sxng-ai-accent', accent);
-                                }
-                            } catch(e) {}
-                        }
-
                         // conversation saved as base64 URL fragment.
                         const updateState = () => {
                             try {
@@ -636,13 +618,13 @@ INTERACTIVE_JS = r'''
                                     }
                                     return btoa(bin);
                                 };
-                                
+
                                 let b64 = encodeB64(state);
                                 while (b64.length > 2000 && state.t.length > 2) {
                                     state.t.splice(1, 2); // Delete in Q&A pairs
                                     b64 = encodeB64(state);
                                 }
-                                
+
                                 history.replaceState(null, null, '#ai=' + b64);
                             } catch(e) {}
                         };
@@ -658,17 +640,17 @@ INTERACTIVE_JS = r'''
                                     if (state.u && Array.isArray(state.u)) {
                                         urls = state.u;
                                     }
-                                    
+
                                     conversation.turns = state.t.map(t => ({
                                         role: t.r === 'u' ? 'user' : 'assistant',
                                         content: t.c.trim(),
                                         ts: 0
                                     }));
-                                    
+
                                     const injectCitations = (text) => {
                                         return renderCitations(text, urls);
                                     };
-                                    
+
                                     data.innerHTML = '';
                                     conversation.turns.forEach((turn, i) => {
                                         if (turn.role === 'user') {
@@ -686,7 +668,6 @@ INTERACTIVE_JS = r'''
                                         }
                                     });
                                     box.style.display = 'block';
-                                    if(wrapper) wrapper.style.display = '';
                                     if(footer && is_interactive) footer.style.display = 'flex';
                                     restored = true;
                                 }
@@ -756,10 +737,10 @@ INTERACTIVE_JS = r'''
                         const handleAction = async (e) => {
                             if (e) e.preventDefault();
                             const val = input.value.trim();
-                            
+
                             conversation.turns.push({role: 'user', content: val, ts: Date.now()});
                             updateState();
-                            
+
                             const currentText = conversation.turns.slice(0, -1).slice(-6)
                                 .map(t => (t.role === 'user' ? 'Q' : 'A') + ': ' + t.content)
                                 .join('\\n\\n');
@@ -782,7 +763,7 @@ INTERACTIVE_JS = r'''
                                 const newCursor = document.createElement('span');
                                 newCursor.className = 'sxng-cursor';
                                 data.appendChild(newCursor);
-                                
+
                                 const synthesized = synthesizeQuery(q_init, val);
                                 let auxContext = null;
                                 try {
@@ -799,7 +780,7 @@ INTERACTIVE_JS = r'''
                                         }
                                     }
                                 } catch (err) {}
-                                
+
                                 await startStream(val, currentText, auxContext);
                                 updateState();
                             } else {
@@ -871,16 +852,92 @@ FRONTEND_JS_TEMPLATE = r"""
     const conversation = {
         originalQuery: q_init,
         originalContext: new TextDecoder().decode(Uint8Array.from(atob(b64_init), c => c.charCodeAt(0))),
-        originalSources: [...urls],
         turns: [{role: 'user', content: q_init, ts: Date.now()}]
     };
     const box = document.getElementById('sxng-stream-box');
     const data = document.getElementById('sxng-stream-data');
-    const wrapper = box.closest('.answer');
-    if (wrapper) wrapper.style.display = 'none';
+
+    (function applyTheme() {
+        try {
+            const root = document.documentElement;
+            const s = getComputedStyle(root);
+            const get = (v, fallback) => s.getPropertyValue(v).trim() || fallback;
+
+            const theme = {
+                '--color-answer-background': get('--color-answer-background', '#313338'),
+                '--color-answer-font':       get('--color-answer-font', '#fff'),
+                '--color-result-link':       get('--color-result-link', '#8aacf7'),
+                '--color-base-font':         get('--color-base-font', '#cdd6f4'),
+                '--color-sidebar-bg':        get('--color-sidebar-bg', '#424247'),
+                '--color-result-hover':      get('--color-result-hover', '#303033'),
+                '--color-base-background':   get('--color-base-background', '#2a2a2e'),
+                '--color-search-font':       get('--color-search-font', '#bbb'),
+                '--color-result-border':     get('--color-result-border', '#4c566a'),
+                '--color-result-description':get('--color-result-description', '#d8dee9'),
+                '--color-toolkit-select-background': get('--color-toolkit-select-background', '#313338'),
+            };
+
+            // Apply to box and any ai-answers container
+            const targets = [box, document.getElementById('ai-answers')].filter(Boolean);
+            targets.forEach(el => {
+                Object.entries(theme).forEach(([k, v]) => {
+                    if (v) el.style.setProperty(k, v);
+                });
+            });
+
+        } catch(e) {}
+    })();
+
+    // Move AI Overview outside #answers, place it before #results
+    (function relocateBox() {
+        const answersDiv = document.getElementById('answers');
+
+        if (!box || !answersDiv) return;
+
+        // Create our own container
+        const aiContainer = document.createElement('div');
+        aiContainer.id = 'ai-answers';
+        const rootStyle = getComputedStyle(document.documentElement);
+        const getVar = (v, fb) => rootStyle.getPropertyValue(v).trim() || fb;
+        const bg = getVar('--color-answer-background', '');
+        const answerFont = getVar('--color-answer-font', '');
+        // Detect light mode by checking if answer font is dark
+        const isLight = answerFont && (answerFont.includes('0,0,0') ||
+            answerFont.includes('#000') || answerFont.includes('#333') ||
+            answerFont.includes('#444') || answerFont.includes('rgb(0') ||
+            answerFont.includes('rgb(3') || answerFont.includes('rgb(4') ||
+            answerFont.includes('rgb(5') || answerFont.includes('rgb(6'));
+        const containerBg = isLight
+            ? 'rgba(0,0,0,0.06)'
+            : (bg || 'var(--color-answer-background, #313338)');
+        aiContainer.style.cssText = [
+            `background: ${containerBg}`,
+            'padding: 1rem',
+            'margin: 0 0 1rem 0',
+            `color: ${getVar('--color-answer-font', 'var(--color-answer-font, #fff)')}`,
+            'border-radius: 8px',
+            'box-sizing: border-box',
+            'width: 100%'
+        ].join('; ');
+
+        // Move our box into the new container
+        aiContainer.appendChild(box);
+
+        const resultsGrid = document.getElementById('results');
+        if (resultsGrid) {
+            // Insert as first child of #results grid so grid-area:answers applies
+            resultsGrid.insertBefore(aiContainer, resultsGrid.firstChild);
+        } else {
+            answersDiv.parentNode.insertBefore(aiContainer, answersDiv);
+        }
+
+        // Hide #answers entirely since our box is now elsewhere
+        answersDiv.style.display = 'none';
+    })();
+
     let restored = false;
     let isStreaming = false;
-    
+
     __CITATION_HELPER_JS__
 
     (function applyIntentBadge() {
@@ -943,11 +1000,10 @@ FRONTEND_JS_TEMPLATE = r"""
             console.warn('[AI Answers] Stream already in progress, ignoring duplicate call');
             return;
         }
-        
+
         isStreaming = true;
         try {
             const ctx = auxContext || conversation.originalContext;
-            if (wrapper) wrapper.style.display = '';
             box.style.display = 'block';
 
             const controller = new AbortController();
@@ -1002,6 +1058,11 @@ FRONTEND_JS_TEMPLATE = r"""
                 data.appendChild(cursor);
             }
 
+            const streamContainer = document.createElement('div');
+            streamContainer.className = 'sxng-stream-container';
+            if (cursor) cursor.before(streamContainer);
+            else data.appendChild(streamContainer);
+
             let buffer = '';
             let fullText = '';
             const flushBuffer = (force = false) => {
@@ -1009,8 +1070,7 @@ FRONTEND_JS_TEMPLATE = r"""
 
                 if (force) {
                     const fragment = renderCitations(buffer, urls);
-                    if (cursor) cursor.before(fragment);
-                    else data.appendChild(fragment);
+                    streamContainer.appendChild(fragment);
                     buffer = '';
                     return;
                 }
@@ -1025,12 +1085,12 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = preText;
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                     }
 
                     const citationText = match[0];
                     const fragment = renderCitations(citationText, urls);
-                    cursor.before(fragment);
+                    streamContainer.appendChild(fragment);
 
                     buffer = buffer.substring(match.index + match[0].length);
                 }
@@ -1041,7 +1101,7 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = buffer;
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                         buffer = '';
                     }
                 } else {
@@ -1050,7 +1110,7 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = safeChunk;
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                     }
                     buffer = buffer.substring(openIdx);
 
@@ -1058,7 +1118,7 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = buffer[0];
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                         buffer = buffer.substring(1);
                     }
                 }
@@ -1120,10 +1180,8 @@ FRONTEND_JS_TEMPLATE = r"""
                 }
             }
 
+            streamContainer.remove();
             if (cursor) cursor.remove();
-
-            // Remove only the streamed chunk spans added during this stream
-            Array.from(data.querySelectorAll('.sxng-chunk')).forEach(node => node.remove());
 
             const rendered = parseMarkdown(fullText.trim());
             const mdDiv = document.createElement('div');
@@ -1151,13 +1209,13 @@ FRONTEND_JS_TEMPLATE = r"""
             console.error('[AI Answers] Fatal stream exception:', e);
             const errSpan = document.createElement('span');
             errSpan.style.cssText = 'color: #bf616a; font-weight: bold; display: block; margin-top: 0.5rem;';
-            
+
             if (e.name === 'AbortError') {
                 errSpan.textContent = "⚠️ Connection to AI provider timed out.";
             } else {
                 errSpan.textContent = "⚠️ AI Widget encountered a fatal error. Check browser console.";
             }
-            
+
             if (data) {
                 const cursor = data.querySelector('.sxng-cursor');
                 if (cursor) cursor.remove();
@@ -1288,8 +1346,6 @@ INTENT_CONFIGS = {
     },
 }
 
-
-import typing
 if typing.TYPE_CHECKING:
     from searx.search import SearchWithPlugins
     from searx.extended_types import SXNG_Request
@@ -1379,7 +1435,7 @@ class SXNGPlugin(Plugin):
                 'content': str(ib.get('content') or '')[:2000],
                 'attributes': ib.get('attributes', [])
             })
-            
+
         answers = []
         for a in list(raw_answers)[:2]:
             ans_text = ""
@@ -1389,7 +1445,7 @@ class SXNGPlugin(Plugin):
                 ans_text = str(a['answer'])
             if ans_text and 'id="sxng-stream-box"' not in ans_text and not ans_text.strip().startswith('<'):
                 answers.append(ans_text)
-                   
+
         return results, infoboxes, answers
 
     def init(self, app):
@@ -1397,10 +1453,10 @@ class SXNGPlugin(Plugin):
         def ai_auxiliary_search():
             if not self.api_key:
                 abort(403)
-            
+
             data = request.json or {}
             token = data.get('tk', '')
-            
+
             # Token access control
             try:
                 ts, sig = token.rsplit('.', 1)
@@ -1420,13 +1476,13 @@ class SXNGPlugin(Plugin):
             offset = data.get('offset', 0)
             if not query:
                 return jsonify({'results': []})
-            
+
             try:
                 from searx.search import SearchWithPlugins
                 from searx.search.models import SearchQuery
                 from searx.query import RawTextQuery
                 from searx.webadapter import get_engineref_from_category_list
-                
+
                 preferences = getattr(request, 'preferences', None)
                 disabled_engines = preferences.engines.get_disabled() if preferences else []
                 rtq = RawTextQuery(query, disabled_engines)
@@ -1434,7 +1490,7 @@ class SXNGPlugin(Plugin):
                     category_list = [c.strip() for c in categories.split(',') if c.strip()]
                 else:
                     category_list = categories or ['general']
-                
+
                 enginerefs = get_engineref_from_category_list(category_list, disabled_engines)
                 sq = SearchQuery(
                     query=rtq.getQuery(),
@@ -1444,19 +1500,19 @@ class SXNGPlugin(Plugin):
                 )
                 search_obj = SearchWithPlugins(sq, request, user_plugins=[])
                 result_container = search_obj.search()
-                
+
                 raw_results = result_container.get_ordered_results()
                 raw_infoboxes = getattr(result_container, 'infoboxes', [])
                 raw_answers = getattr(result_container, 'answers', [])
-                
+
                 results, infoboxes, answers = self._parse_aux_results(raw_results, raw_infoboxes, raw_answers)
-                
+
                 context_str, new_urls = self._assemble_context(results, infoboxes, answers, offset)
 
                 return jsonify({
                     'context': context_str,
                     'new_urls': new_urls,
-                    'results': results, 
+                    'results': results,
                     'infoboxes': infoboxes,
                     'answers': answers,
                     'query': query
@@ -1669,6 +1725,16 @@ class SXNGPlugin(Plugin):
 
             job_id = hashlib.sha256(f"{time.time()}{q}".encode()).hexdigest()[:16]
 
+            # Persist intent for dev UI
+            logger.warning(f"INTENT BEFORE PERSIST: {repr(intent)}")
+            logger.warning(f"JOB_ID BEFORE PERSIST: {repr(job_id)}")
+            try:
+                vk = _get_valkey()
+                vk.setex(f"ai:job:{job_id}:intent", 3600, intent)
+                logger.debug(f"{PLUGIN_NAME}: persisted intent '{intent}' for job {job_id}")
+            except Exception:
+                logger.exception(f"{PLUGIN_NAME}: failed to persist intent")
+
             payload_dict = {
                 "model": effective_model,
                 "messages": [
@@ -1876,12 +1942,12 @@ class SXNGPlugin(Plugin):
         """Builds context string from normalized search data. Returns (context_str, urls)."""
         context_parts = []
         result_urls = []
-        
+
         knowledge_graph_lines = []
         for ib in infoboxes:
             ib_name = ib.get('name', '') or ib.get('infobox', '') or ib.get('title', '')
             ib_content = str(ib.get('content', '')).replace('\n', ' ').strip()
-            
+
             if ib_name:
                 parts = [f"INFOBOX [{ib_name}]:"]
                 if ib_content:
@@ -1891,16 +1957,16 @@ class SXNGPlugin(Plugin):
                     attr_value = attr.get('value', '')
                     if attr_label and attr_value:
                         parts.append(f"  {attr_label}: {attr_value}")
-                
+
                 knowledge_graph_lines.append(" ".join(parts) if len(parts) == 2 else "\n".join(parts))
 
         for ans_text in answers:
             if ans_text and not str(ans_text).startswith('<'):
                 knowledge_graph_lines.append(f"ANSWER: {str(ans_text)[:300]}")
-        
+
         if knowledge_graph_lines:
             context_parts.append("KNOWLEDGE GRAPH:\n" + "\n".join(knowledge_graph_lines))
-        
+
         deep_lines = []
         for i, r in enumerate(clean_results[:self.context_deep_count]):
             url = r.get('url', '')
@@ -1916,10 +1982,10 @@ class SXNGPlugin(Plugin):
                 logger.debug(f"{PLUGIN_NAME}: falling back to snippet for [{idx}] {domain}")
                 content = str(r.get('content', '')).replace('\n', ' ').strip()[:800]
                 deep_lines.append(f"[{idx}] {domain}{date_str}: {title}: {content}")
-        
+
         if deep_lines:
             context_parts.append("DEEP SOURCES:\n" + "\n".join(deep_lines))
-            
+
         if self.context_shallow_count > 0:
             shallow_lines = []
             start_idx = self.context_deep_count
@@ -1931,10 +1997,10 @@ class SXNGPlugin(Plugin):
                 title = r.get('title', '').replace('\n', ' ').strip()[:60]
                 idx = i + 1 + start_idx + offset
                 shallow_lines.append(f"[{idx}] {domain}: {title}")
-            
+
             if shallow_lines:
                 context_parts.append("SHALLOW SOURCES (headlines):\n" + "\n".join(shallow_lines))
-        
+
         return "\n\n".join(context_parts), result_urls
 
     def post_search(self, request: "SXNG_Request", search: "SearchWithPlugins") -> EngineResults:
@@ -1958,7 +2024,7 @@ class SXNGPlugin(Plugin):
             raw_results = search.result_container.get_ordered_results()
             raw_infoboxes = getattr(search.result_container, 'infoboxes', [])
             raw_answers = getattr(search.result_container, 'answers', [])
-            
+
             q_clean = search.search_query.query.strip()
             clean_results, infoboxes, answers = self._parse_aux_results(raw_results, raw_infoboxes, raw_answers)
             clean_results = self._enrich_results(clean_results, q_clean)
@@ -1981,12 +2047,23 @@ class SXNGPlugin(Plugin):
 
             detected_intent = _detect_intent(q_clean)
             js_intent = safe_json(detected_intent)
-            
+
+            # Persist intent for dev tooling / UI
+            try:
+                vk = _get_valkey()
+                vk.setex(
+                    f"ai:job:{job_id}:intent",
+                    1800,
+                    detected_intent
+                )
+            except Exception as e:
+                logger.debug(f"{PLUGIN_NAME}: failed to persist intent: {e}")
+
             b64_context = base64.b64encode(context_str.encode('utf-8')).decode('utf-8')
             total_context_count = self.context_deep_count + self.context_shallow_count
-            
+
             raw_urls = [r.get('url', '') for r in clean_results[:total_context_count]]
-            
+
             js_q = safe_json(q_clean)
             js_lang = safe_json(lang)
             js_urls = safe_json(raw_urls)
@@ -2028,7 +2105,7 @@ class SXNGPlugin(Plugin):
                 .replace("__JS_Q__", js_q)
 
             html_payload = f'''
-                <article id="sxng-stream-box" class="answer" style="display:none; margin-top: 0; margin-bottom: 0;">
+                <article id="sxng-stream-box" class="answer" style="display:none; margin: 0; padding: 0;">
                     <style>
                         @keyframes sxng-fade-pulse {{
                             0%, 100% {{ opacity: 0.1; }}
@@ -2078,11 +2155,11 @@ class SXNGPlugin(Plugin):
                     </style>
                     <div class="sxng-ai-header">
                         <span class="sxng-ai-label">
-                            <span style="color:#4a9eff;font-size:1.1em;">✦</span> AI Overview
+                            <span style="color:var(--color-result-link, #4a9eff);font-size:1.1em;">✦</span> AI Overview
                         </span>
                         <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
                     </div>
-                    <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
+                    <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-answer-font, var(--color-result-description, inherit)); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
                     <script>
                     {js_code}
