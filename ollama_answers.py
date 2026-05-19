@@ -278,15 +278,15 @@ INTERACTIVE_CSS = '''
                             padding: 0;
                             border: none;
                             border-radius: 4px;
-                            background: var(--color-sidebar-bg, #424247);
-                            color: var(--color-search-url, #bbb);
+                            background: var(--color-sidebar-bg, transparent);
+                            color: var(--color-search-font, inherit);
                             cursor: pointer;
                             vertical-align: middle;
                             line-height: 1.4;
                         }
                         .sxng-btn:hover {
-                            background: var(--color-search-url, #303033);
-                            color: var(--color-sidebar-bg, #bbb);
+                            background: var(--color-result-hover, transparent);
+                            color: var(--color-sidebar-bg, inherit);
                         }
                         .sxng-btn svg { width: 18px; height: 18px; fill: currentColor; }
                         .sxng-input-wrapper {
@@ -300,9 +300,9 @@ INTERACTIVE_CSS = '''
                         .sxng-input {
                             width: 100%;
                             height: -webkit-fill-available;
-                            background: var(--color-sidebar-bg, #424247);
+                            background: var(--color-sidebar-bg, transparent);
                             border: none;
-                            color: var(--color-base-font, #cdd6f4);
+                            color: var(--color-base-font, inherit);
                             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                             font-size: 0.78em;
                             padding: 3px 8px;
@@ -311,7 +311,7 @@ INTERACTIVE_CSS = '''
                             vertical-align: middle;
                         }
                         .sxng-input:focus { outline: none; }
-                        .sxng-input::placeholder { color: var(--color-base-font, #333); opacity: 0.35; }
+                        .sxng-input::placeholder { color: var(--color-base-font, inherit); opacity: 0.35; }
                         .sxng-input-line {
                             position: absolute;
                             bottom: 0;
@@ -344,14 +344,14 @@ INTERACTIVE_CSS = '''
                             appearance: none;
                             -webkit-appearance: none;
                             background: url("data:image/svg+xml;charset=UTF-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%3Cg%20fill%3D%22%23aaa%22%3E%0A%3Cpolygon%20points%3D%22128%2C192%20256%2C320%20384%2C192%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E") calc(100% + 2rem) / 1rem no-repeat content-box border-box;
-                            background-color: var(--color-toolkit-select-background, #424247);
+                            background-color: var(--color-toolkit-select-background, transparent);
                             text-overflow: ellipsis;
                             border-width: 0 2rem 0 0;
                             border-color: transparent;
                             border-radius: 5px;
                             outline: none;
                             height: 25px;
-                            color: var(--color-search-url, #bbb);
+                            color: var(--color-search-font, inherit);
                             font-size: .9rem;
                             padding: 1px 10px 1px 10px !important;
                             margin: 0;
@@ -406,7 +406,7 @@ INTERACTIVE_CSS = '''
                         .sxng-prior-answer {
                             margin: 0.25rem 0;
                             padding-left: 0.5rem;
-                            color: var(--color-base-font, #cdd6f4);
+                            color: var(--color-base-font, inherit);
                         }
                         .sxng-md-content {
                             line-height: 1.6;
@@ -904,11 +904,13 @@ FRONTEND_JS_TEMPLATE = r"""
         // Create our own container
         const aiContainer = document.createElement('div');
         aiContainer.id = 'ai-answers';
+        const rootStyle = getComputedStyle(document.documentElement);
+        const getVar = (v, fb) => rootStyle.getPropertyValue(v).trim() || fb;
         aiContainer.style.cssText = [
-            'background: var(--color-answer-background)',
+            `background: ${getVar('--color-answer-background', 'var(--color-answer-background, #313338)')}`,
             'padding: 1rem',
             'margin: 0 0 1rem 0',
-            'color: var(--color-answer-font)',
+            `color: ${getVar('--color-answer-font', 'var(--color-answer-font, #fff)')}`,
             'border-radius: 8px',
             'box-sizing: border-box',
             'width: 100%'
@@ -2134,7 +2136,7 @@ class SXNGPlugin(Plugin):
                         </span>
                         <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
                     </div>
-                    <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-result-description); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
+                    <p id="sxng-stream-data" style="white-space: pre-wrap; color: var(--color-answer-font, var(--color-result-description, inherit)); font-size: 0.95rem; margin:0;"><span class="sxng-cursor"></span></p>
                     {interactive_html}
                     <script>
                     {js_code}
