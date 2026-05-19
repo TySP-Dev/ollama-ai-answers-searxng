@@ -104,13 +104,43 @@ Configure via environment variables.
 
 ## Known Issues
 
+- [ ] Update README with all updates
+
 - [x] When asking a follow up question the previous output disappears
-- [ ] Parts of the UI are not theme aware resulting in a unpolished look when not using a dark theme
+
+- [x] Parts of the UI are not theme aware resulting in a unpolished look when not using a dark theme
+
 - [x] When SearXNG provides a info blob for a search it appears on top of the overview i.e. `Wikipedia` or `Linux` 
 
 For any issues not stated here please create an issue ticket on [Gitea](https://git.tysstech.com/TySS-Dev/ollama-ai-answers-searxng/issues) or [GitHub](https://github.com/TySP-Dev/ollama-ai-answers-searxng/issues) and add the `bug` tag.
 
 ## Roadmap
+
+### Dev Server
+
+- [x] Stream viewer — show tokens arriving in real time in the debug panel as they come out of Valkey, so you can see exactly what the LLM is generating chunk by chunk
+
+- [x] TF-IDF score visualizer — show a table of which URLs were fetched, their scores, and which chunks were selected for context
+
+- [ ] Intent detection display — show what intent was detected and which system prompt was used for each query
+
+- [ ] Saved queries — save/load test queries so you can quickly re-run the same set of searches after making changes to the plugin
+
+- [ ] A/B model comparison — run the same query against two different models simultaneously and show both responses side by side
+
+- [ ] Response time breakdown — show how long each phase took: SearXNG fetch, page fetching, TF-IDF scoring, LLM stream start, stream complete
+
+- [ ] Context inspector — show the full assembled context string that gets sent to the LLM, so you can see exactly what it's working with
+
+- [ ] Prompt viewer — show the full system prompt + user prompt that gets sent to Ollama
+
+- [ ] Export button — copy the full context + prompt + response as a JSON blob for bug reports
+
+- [ ] Per-intent system prompt editor — edit the system prompts for each intent type live without restarting
+
+- [ ] Token counter — show estimated token count of the context being sent
+
+### Plugin
 
 - [ ] Working on feature plans
 

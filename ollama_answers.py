@@ -1725,6 +1725,16 @@ class SXNGPlugin(Plugin):
 
             job_id = hashlib.sha256(f"{time.time()}{q}".encode()).hexdigest()[:16]
 
+            # Persist intent for dev UI
+            logger.warning(f"INTENT BEFORE PERSIST: {repr(intent)}")
+            logger.warning(f"JOB_ID BEFORE PERSIST: {repr(job_id)}")
+            try:
+                vk = _get_valkey()
+                vk.setex(f"ai:job:{job_id}:intent", 3600, intent)
+                logger.debug(f"{PLUGIN_NAME}: persisted intent '{intent}' for job {job_id}")
+            except Exception:
+                logger.exception(f"{PLUGIN_NAME}: failed to persist intent")
+
             payload_dict = {
                 "model": effective_model,
                 "messages": [
@@ -2037,6 +2047,17 @@ class SXNGPlugin(Plugin):
 
             detected_intent = _detect_intent(q_clean)
             js_intent = safe_json(detected_intent)
+
+            # Persist intent for dev tooling / UI
+            try:
+                vk = _get_valkey()
+                vk.setex(
+                    f"ai:job:{job_id}:intent",
+                    1800,
+                    detected_intent
+                )
+            except Exception as e:
+                logger.debug(f"{PLUGIN_NAME}: failed to persist intent: {e}")
 
             b64_context = base64.b64encode(context_str.encode('utf-8')).decode('utf-8')
             total_context_count = self.context_deep_count + self.context_shallow_count
