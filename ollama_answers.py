@@ -385,7 +385,8 @@ INTERACTIVE_CSS = '''
                             font-size: 0.75em;
                             color: var(--color-result-link, #5e81ac);
                             text-decoration: none;
-                            opacity: 0.75;
+                            opacity: 1;
+                            font-weight: 600;
                         }
                         .sxng-citation-item a:hover {
                             opacity: 1;
@@ -395,13 +396,13 @@ INTERACTIVE_CSS = '''
                             margin-bottom: 0.75rem;
                             padding: 0.5rem;
                             border-left: 2px solid var(--color-result-link, #5e81ac);
-                            opacity: 0.6;
+                            opacity: 0.85;
                             font-size: 0.85em;
                         }
                         .sxng-prior-history summary {
                             cursor: pointer;
                             color: var(--color-result-link, #5e81ac);
-                            font-weight: 600;
+                            font-weight: 700;
                         }
                         .sxng-prior-answer {
                             margin: 0.25rem 0;
