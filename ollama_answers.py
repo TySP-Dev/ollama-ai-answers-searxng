@@ -1,4 +1,4 @@
-import json, os, logging, base64, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
+import json, os, logging, base64, typing, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
 from collections import Counter
 from urllib.parse import urlparse
 try:
@@ -1346,8 +1346,6 @@ INTENT_CONFIGS = {
     },
 }
 
-
-import typing
 if typing.TYPE_CHECKING:
     from searx.search import SearchWithPlugins
     from searx.extended_types import SXNG_Request
