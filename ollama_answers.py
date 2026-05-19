@@ -876,8 +876,18 @@ FRONTEND_JS_TEMPLATE = r"""
     };
     const box = document.getElementById('sxng-stream-box');
     const data = document.getElementById('sxng-stream-data');
-    const wrapper = box.closest('.answer');
-    if (wrapper) wrapper.style.display = 'none';
+
+    // Hide native SearXNG answer entries that are siblings of our box
+    setTimeout(() => {
+        const parent = box ? box.parentElement : null;
+        if (parent) {
+            Array.from(parent.children).forEach(el => {
+                if (el !== box && el.classList.contains('answer')) {
+                    el.style.display = 'none';
+                }
+            });
+        }
+    }, 0);
     let restored = false;
     let isStreaming = false;
     
@@ -947,7 +957,6 @@ FRONTEND_JS_TEMPLATE = r"""
         isStreaming = true;
         try {
             const ctx = auxContext || conversation.originalContext;
-            if (wrapper) wrapper.style.display = '';
             box.style.display = 'block';
 
             const controller = new AbortController();
@@ -1002,6 +1011,11 @@ FRONTEND_JS_TEMPLATE = r"""
                 data.appendChild(cursor);
             }
 
+            const streamContainer = document.createElement('div');
+            streamContainer.className = 'sxng-stream-container';
+            if (cursor) cursor.before(streamContainer);
+            else data.appendChild(streamContainer);
+
             let buffer = '';
             let fullText = '';
             const flushBuffer = (force = false) => {
@@ -1009,8 +1023,7 @@ FRONTEND_JS_TEMPLATE = r"""
 
                 if (force) {
                     const fragment = renderCitations(buffer, urls);
-                    if (cursor) cursor.before(fragment);
-                    else data.appendChild(fragment);
+                    streamContainer.appendChild(fragment);
                     buffer = '';
                     return;
                 }
@@ -1025,12 +1038,12 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = preText;
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                     }
 
                     const citationText = match[0];
                     const fragment = renderCitations(citationText, urls);
-                    cursor.before(fragment);
+                    streamContainer.appendChild(fragment);
 
                     buffer = buffer.substring(match.index + match[0].length);
                 }
@@ -1041,7 +1054,7 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = buffer;
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                         buffer = '';
                     }
                 } else {
@@ -1050,7 +1063,7 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = safeChunk;
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                     }
                     buffer = buffer.substring(openIdx);
 
@@ -1058,7 +1071,7 @@ FRONTEND_JS_TEMPLATE = r"""
                         const s = document.createElement('span');
                         s.className = 'sxng-chunk';
                         s.textContent = buffer[0];
-                        cursor.before(s);
+                        streamContainer.appendChild(s);
                         buffer = buffer.substring(1);
                     }
                 }
@@ -1120,10 +1133,8 @@ FRONTEND_JS_TEMPLATE = r"""
                 }
             }
 
+            streamContainer.remove();
             if (cursor) cursor.remove();
-
-            // Remove only the streamed chunk spans added during this stream
-            Array.from(data.querySelectorAll('.sxng-chunk')).forEach(node => node.remove());
 
             const rendered = parseMarkdown(fullText.trim());
             const mdDiv = document.createElement('div');
