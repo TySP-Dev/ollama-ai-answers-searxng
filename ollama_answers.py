@@ -335,9 +335,9 @@ INTERACTIVE_CSS = '''
                             opacity: 0.55;
                             animation: sxng-fade-in-up 0.3s ease-out forwards;
                         }
-                        .sxng-input-wrapper:focus-within { 
-                            opacity: 1; 
-                            color: var(--color-result-link, #5e81ac); 
+                        .sxng-input-wrapper:focus-within {
+                            opacity: 1;
+                            color: var(--color-result-link, #5e81ac);
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
                         .sxng-model-select {
@@ -507,7 +507,7 @@ CITATION_HELPER_JS = r'''
                             const re = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
                             let lastIdx = 0;
                             const matches = [...text.matchAll(re)];
-                            
+
                             matches.forEach(match => {
                                 if (match.index > lastIdx) {
                                     const s = document.createElement('span');
@@ -542,7 +542,7 @@ CITATION_HELPER_JS = r'''
                                 });
                                 lastIdx = match.index + match[0].length;
                             });
-                            
+
                             if (lastIdx < text.length) {
                                 const s = document.createElement('span');
                                 s.className = 'sxng-chunk';
@@ -636,13 +636,13 @@ INTERACTIVE_JS = r'''
                                     }
                                     return btoa(bin);
                                 };
-                                
+
                                 let b64 = encodeB64(state);
                                 while (b64.length > 2000 && state.t.length > 2) {
                                     state.t.splice(1, 2); // Delete in Q&A pairs
                                     b64 = encodeB64(state);
                                 }
-                                
+
                                 history.replaceState(null, null, '#ai=' + b64);
                             } catch(e) {}
                         };
@@ -658,17 +658,17 @@ INTERACTIVE_JS = r'''
                                     if (state.u && Array.isArray(state.u)) {
                                         urls = state.u;
                                     }
-                                    
+
                                     conversation.turns = state.t.map(t => ({
                                         role: t.r === 'u' ? 'user' : 'assistant',
                                         content: t.c.trim(),
                                         ts: 0
                                     }));
-                                    
+
                                     const injectCitations = (text) => {
                                         return renderCitations(text, urls);
                                     };
-                                    
+
                                     data.innerHTML = '';
                                     conversation.turns.forEach((turn, i) => {
                                         if (turn.role === 'user') {
@@ -756,10 +756,10 @@ INTERACTIVE_JS = r'''
                         const handleAction = async (e) => {
                             if (e) e.preventDefault();
                             const val = input.value.trim();
-                            
+
                             conversation.turns.push({role: 'user', content: val, ts: Date.now()});
                             updateState();
-                            
+
                             const currentText = conversation.turns.slice(0, -1).slice(-6)
                                 .map(t => (t.role === 'user' ? 'Q' : 'A') + ': ' + t.content)
                                 .join('\\n\\n');
@@ -782,7 +782,7 @@ INTERACTIVE_JS = r'''
                                 const newCursor = document.createElement('span');
                                 newCursor.className = 'sxng-cursor';
                                 data.appendChild(newCursor);
-                                
+
                                 const synthesized = synthesizeQuery(q_init, val);
                                 let auxContext = null;
                                 try {
@@ -799,7 +799,7 @@ INTERACTIVE_JS = r'''
                                         }
                                     }
                                 } catch (err) {}
-                                
+
                                 await startStream(val, currentText, auxContext);
                                 updateState();
                             } else {
@@ -880,23 +880,29 @@ FRONTEND_JS_TEMPLATE = r"""
     // Move AI Overview outside #answers, place it before #results
     (function relocateBox() {
         const answersDiv = document.getElementById('answers');
-        const resultsDiv = document.getElementById('results') ||
-                           document.querySelector('.results') ||
-                           document.querySelector('#urls');
 
         if (!box || !answersDiv) return;
 
         // Create our own container
         const aiContainer = document.createElement('div');
         aiContainer.id = 'ai-answers';
-        aiContainer.style.cssText = 'margin-bottom: 1rem;';
+        aiContainer.style.cssText = [
+            'background: var(--color-answer-background)',
+            'padding: 1rem',
+            'margin: 0 0 1rem 0',
+            'color: var(--color-answer-font)',
+            'border-radius: 8px',
+            'box-sizing: border-box',
+            'width: 100%'
+        ].join('; ');
 
         // Move our box into the new container
         aiContainer.appendChild(box);
 
-        // Insert before results, or before #answers if no results found
-        if (resultsDiv) {
-            resultsDiv.parentNode.insertBefore(aiContainer, resultsDiv);
+        const resultsGrid = document.getElementById('results');
+        if (resultsGrid) {
+            // Insert as first child of #results grid so grid-area:answers applies
+            resultsGrid.insertBefore(aiContainer, resultsGrid.firstChild);
         } else {
             answersDiv.parentNode.insertBefore(aiContainer, answersDiv);
         }
@@ -907,7 +913,7 @@ FRONTEND_JS_TEMPLATE = r"""
 
     let restored = false;
     let isStreaming = false;
-    
+
     __CITATION_HELPER_JS__
 
     (function applyIntentBadge() {
@@ -970,7 +976,7 @@ FRONTEND_JS_TEMPLATE = r"""
             console.warn('[AI Answers] Stream already in progress, ignoring duplicate call');
             return;
         }
-        
+
         isStreaming = true;
         try {
             const ctx = auxContext || conversation.originalContext;
@@ -1179,13 +1185,13 @@ FRONTEND_JS_TEMPLATE = r"""
             console.error('[AI Answers] Fatal stream exception:', e);
             const errSpan = document.createElement('span');
             errSpan.style.cssText = 'color: #bf616a; font-weight: bold; display: block; margin-top: 0.5rem;';
-            
+
             if (e.name === 'AbortError') {
                 errSpan.textContent = "⚠️ Connection to AI provider timed out.";
             } else {
                 errSpan.textContent = "⚠️ AI Widget encountered a fatal error. Check browser console.";
             }
-            
+
             if (data) {
                 const cursor = data.querySelector('.sxng-cursor');
                 if (cursor) cursor.remove();
@@ -1407,7 +1413,7 @@ class SXNGPlugin(Plugin):
                 'content': str(ib.get('content') or '')[:2000],
                 'attributes': ib.get('attributes', [])
             })
-            
+
         answers = []
         for a in list(raw_answers)[:2]:
             ans_text = ""
@@ -1417,7 +1423,7 @@ class SXNGPlugin(Plugin):
                 ans_text = str(a['answer'])
             if ans_text and 'id="sxng-stream-box"' not in ans_text and not ans_text.strip().startswith('<'):
                 answers.append(ans_text)
-                   
+
         return results, infoboxes, answers
 
     def init(self, app):
@@ -1425,10 +1431,10 @@ class SXNGPlugin(Plugin):
         def ai_auxiliary_search():
             if not self.api_key:
                 abort(403)
-            
+
             data = request.json or {}
             token = data.get('tk', '')
-            
+
             # Token access control
             try:
                 ts, sig = token.rsplit('.', 1)
@@ -1448,13 +1454,13 @@ class SXNGPlugin(Plugin):
             offset = data.get('offset', 0)
             if not query:
                 return jsonify({'results': []})
-            
+
             try:
                 from searx.search import SearchWithPlugins
                 from searx.search.models import SearchQuery
                 from searx.query import RawTextQuery
                 from searx.webadapter import get_engineref_from_category_list
-                
+
                 preferences = getattr(request, 'preferences', None)
                 disabled_engines = preferences.engines.get_disabled() if preferences else []
                 rtq = RawTextQuery(query, disabled_engines)
@@ -1462,7 +1468,7 @@ class SXNGPlugin(Plugin):
                     category_list = [c.strip() for c in categories.split(',') if c.strip()]
                 else:
                     category_list = categories or ['general']
-                
+
                 enginerefs = get_engineref_from_category_list(category_list, disabled_engines)
                 sq = SearchQuery(
                     query=rtq.getQuery(),
@@ -1472,19 +1478,19 @@ class SXNGPlugin(Plugin):
                 )
                 search_obj = SearchWithPlugins(sq, request, user_plugins=[])
                 result_container = search_obj.search()
-                
+
                 raw_results = result_container.get_ordered_results()
                 raw_infoboxes = getattr(result_container, 'infoboxes', [])
                 raw_answers = getattr(result_container, 'answers', [])
-                
+
                 results, infoboxes, answers = self._parse_aux_results(raw_results, raw_infoboxes, raw_answers)
-                
+
                 context_str, new_urls = self._assemble_context(results, infoboxes, answers, offset)
 
                 return jsonify({
                     'context': context_str,
                     'new_urls': new_urls,
-                    'results': results, 
+                    'results': results,
                     'infoboxes': infoboxes,
                     'answers': answers,
                     'query': query
@@ -1904,12 +1910,12 @@ class SXNGPlugin(Plugin):
         """Builds context string from normalized search data. Returns (context_str, urls)."""
         context_parts = []
         result_urls = []
-        
+
         knowledge_graph_lines = []
         for ib in infoboxes:
             ib_name = ib.get('name', '') or ib.get('infobox', '') or ib.get('title', '')
             ib_content = str(ib.get('content', '')).replace('\n', ' ').strip()
-            
+
             if ib_name:
                 parts = [f"INFOBOX [{ib_name}]:"]
                 if ib_content:
@@ -1919,16 +1925,16 @@ class SXNGPlugin(Plugin):
                     attr_value = attr.get('value', '')
                     if attr_label and attr_value:
                         parts.append(f"  {attr_label}: {attr_value}")
-                
+
                 knowledge_graph_lines.append(" ".join(parts) if len(parts) == 2 else "\n".join(parts))
 
         for ans_text in answers:
             if ans_text and not str(ans_text).startswith('<'):
                 knowledge_graph_lines.append(f"ANSWER: {str(ans_text)[:300]}")
-        
+
         if knowledge_graph_lines:
             context_parts.append("KNOWLEDGE GRAPH:\n" + "\n".join(knowledge_graph_lines))
-        
+
         deep_lines = []
         for i, r in enumerate(clean_results[:self.context_deep_count]):
             url = r.get('url', '')
@@ -1944,10 +1950,10 @@ class SXNGPlugin(Plugin):
                 logger.debug(f"{PLUGIN_NAME}: falling back to snippet for [{idx}] {domain}")
                 content = str(r.get('content', '')).replace('\n', ' ').strip()[:800]
                 deep_lines.append(f"[{idx}] {domain}{date_str}: {title}: {content}")
-        
+
         if deep_lines:
             context_parts.append("DEEP SOURCES:\n" + "\n".join(deep_lines))
-            
+
         if self.context_shallow_count > 0:
             shallow_lines = []
             start_idx = self.context_deep_count
@@ -1959,10 +1965,10 @@ class SXNGPlugin(Plugin):
                 title = r.get('title', '').replace('\n', ' ').strip()[:60]
                 idx = i + 1 + start_idx + offset
                 shallow_lines.append(f"[{idx}] {domain}: {title}")
-            
+
             if shallow_lines:
                 context_parts.append("SHALLOW SOURCES (headlines):\n" + "\n".join(shallow_lines))
-        
+
         return "\n\n".join(context_parts), result_urls
 
     def post_search(self, request: "SXNG_Request", search: "SearchWithPlugins") -> EngineResults:
@@ -1986,7 +1992,7 @@ class SXNGPlugin(Plugin):
             raw_results = search.result_container.get_ordered_results()
             raw_infoboxes = getattr(search.result_container, 'infoboxes', [])
             raw_answers = getattr(search.result_container, 'answers', [])
-            
+
             q_clean = search.search_query.query.strip()
             clean_results, infoboxes, answers = self._parse_aux_results(raw_results, raw_infoboxes, raw_answers)
             clean_results = self._enrich_results(clean_results, q_clean)
@@ -2009,12 +2015,12 @@ class SXNGPlugin(Plugin):
 
             detected_intent = _detect_intent(q_clean)
             js_intent = safe_json(detected_intent)
-            
+
             b64_context = base64.b64encode(context_str.encode('utf-8')).decode('utf-8')
             total_context_count = self.context_deep_count + self.context_shallow_count
-            
+
             raw_urls = [r.get('url', '') for r in clean_results[:total_context_count]]
-            
+
             js_q = safe_json(q_clean)
             js_lang = safe_json(lang)
             js_urls = safe_json(raw_urls)
@@ -2056,7 +2062,7 @@ class SXNGPlugin(Plugin):
                 .replace("__JS_Q__", js_q)
 
             html_payload = f'''
-                <article id="sxng-stream-box" class="answer" style="display:none; margin-top: 0; margin-bottom: 0;">
+                <article id="sxng-stream-box" class="answer" style="display:none; margin: 0; padding: 0;">
                     <style>
                         @keyframes sxng-fade-pulse {{
                             0%, 100% {{ opacity: 0.1; }}
