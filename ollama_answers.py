@@ -340,6 +340,47 @@ INTERACTIVE_CSS = '''
                             color: var(--color-result-link, #5e81ac);
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
+                        .sxng-input-wrapper {
+                            position: relative;
+                            overflow: hidden;
+                            border-radius: 4px;
+                        }
+                        .sxng-input-wrapper::before {
+                            content: "";
+                            display: block;
+                            background: linear-gradient(
+                                90deg,
+                                var(--color-result-link, #4a9eff) 0%,
+                                hsla(210, 100%, 80%, 0.6) 50%,
+                                var(--color-result-link, #4a9eff) 100%
+                            );
+                            height: 200px;
+                            width: 200px;
+                            position: absolute;
+                            animation: sxng-border-rotate 4s linear infinite;
+                            z-index: 0;
+                            opacity: 0;
+                            transition: opacity 0.3s ease;
+                            top: 50%;
+                            left: 50%;
+                            transform-origin: center center;
+                            margin-top: -100px;
+                            margin-left: -100px;
+                        }
+                        .sxng-input-wrapper:focus-within::before {
+                            opacity: 1;
+                        }
+                        @keyframes sxng-border-rotate {
+                            from { transform: rotate(0deg); }
+                            to { transform: rotate(360deg); }
+                        }
+                        .sxng-input {
+                            position: relative;
+                            z-index: 1;
+                            margin: 1px;
+                            width: calc(100% - 2px);
+                            border-radius: 3px;
+                        }
                         .sxng-model-select {
                             appearance: none;
                             -webkit-appearance: none;
