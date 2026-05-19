@@ -296,9 +296,7 @@ INTERACTIVE_CSS = '''
                             align-items: center;
                             margin: 0 0.5rem;
                             position: relative;
-                            overflow: hidden;
                             border-radius: 4px;
-                            background: var(--color-result-border, rgba(0,0,0,0.15));
                         }
                         .sxng-input {
                             width: 100%;
@@ -343,44 +341,21 @@ INTERACTIVE_CSS = '''
                             color: var(--color-result-link, #5e81ac);
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
-                        .sxng-input-wrapper::before {
-                            content: "";
-                            display: block;
-                            background: conic-gradient(
-                                from 0deg,
-                                transparent 0deg,
-                                var(--color-result-link, #4a9eff) 60deg,
-                                transparent 120deg
-                            );
-                            height: 300px;
-                            width: 300px;
-                            position: absolute;
-                            animation: sxng-border-rotate 3s linear infinite;
-                            z-index: 0;
-                            opacity: 0;
-                            transition: opacity 0.4s ease;
-                            top: 50%;
-                            left: 50%;
-                            margin-top: -150px;
-                            margin-left: -150px;
-                            transform-origin: center center;
+                        @keyframes sxng-input-glow {
+                            0% {
+                                box-shadow: 0 0 0 0px var(--color-result-link, #4a9eff);
+                            }
+                            50% {
+                                box-shadow: 0 0 6px 2px var(--color-result-link, #4a9eff);
+                            }
+                            100% {
+                                box-shadow: 0 0 0 0px var(--color-result-link, #4a9eff);
+                            }
                         }
-                        .sxng-input-wrapper:focus-within::before {
-                            opacity: 1;
-                        }
-                        @keyframes sxng-border-rotate {
-                            from { transform: rotate(0deg); }
-                            to { transform: rotate(360deg); }
-                        }
-                        .sxng-input {
-                            position: relative;
-                            z-index: 1;
-                            margin: 1px;
-                            width: calc(100% - 2px);
-                            height: calc(100% - 2px);
-                            border-radius: 3px;
-                            background: var(--color-base-background-hover, rgba(0,0,0,0.06));
-                            border: none;
+                        .sxng-input:focus {
+                            outline: none;
+                            border-color: var(--color-result-link, #4a9eff);
+                            animation: sxng-input-glow 2s ease-in-out infinite;
                         }
                         .sxng-model-select {
                             appearance: none;
