@@ -2,3 +2,4 @@ flask
 flask-babel
 certifi
 python-dotenv
+valkey

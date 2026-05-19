@@ -1058,7 +1058,6 @@ async function doSearch() {
         fetch('/dev/last-scores?t=' + Date.now())
           .then(r => r.json())
           .then(meta => {
-            console.log('LAST SCORES:', meta);
 
             const intentEl = document.getElementById('intent');
             if (intentEl) {
