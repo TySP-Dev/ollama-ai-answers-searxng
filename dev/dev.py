@@ -386,17 +386,6 @@ def dev_search():
 
     scores.sort(key=lambda s: s['score'], reverse=True)
 
-    # Refresh latest intent from Valkey
-    try:
-        from ollama_answers import _get_valkey
-        vk = _get_valkey()
-        latest_intent = vk.get("ai:last_intent")
-
-        if latest_intent:
-            detected_intent = latest_intent
-    except Exception:
-        pass
-
     _last_render['html'] = html_payload
     _last_render['query'] = query
     _last_render['intent'] = detected_intent
@@ -526,6 +515,20 @@ def dev_stream_watch():
                        'Cache-Control': 'no-cache',
                        'X-Accel-Buffering': 'no'
                    })
+
+@app.route('/dev/job-intent/<job_id>')
+def dev_job_intent(job_id):
+    try:
+        import valkey as _vk
+        host = os.getenv('VALKEY_HOST', 'localhost')
+        port = int(os.getenv('VALKEY_PORT', 6379))
+        v = _vk.Valkey(host=host, port=port,
+                       socket_connect_timeout=2,
+                       decode_responses=True)
+        intent = v.get(f"ai:job:{job_id}:intent")
+        return jsonify({'intent': intent or '—', 'job_id': job_id})
+    except Exception as e:
+        return jsonify({'intent': '—', 'error': str(e)})
 
 # ── dev config update ─────────────────────────────────────────────────────────
 @app.route('/dev/config', methods=['POST'])
@@ -1329,6 +1332,13 @@ async function attachStreamViewer() {
             document.getElementById('stream-status').textContent = '✓ Done';
             document.getElementById('stream-status').style.color = 'var(--green)';
             document.getElementById('sv-total-time').textContent = `Total: ${total}ms`;
+            fetch(`/dev/job-intent/${jobId}`)
+                .then(r => r.json())
+                .then(d => {
+                    const svIntent = document.getElementById('sv-intent');
+                    if (svIntent) svIntent.textContent = d.intent || '—';
+                })
+                .catch(() => {});
             return;
         }
         if (e.data.startsWith('__ERROR__')) {
