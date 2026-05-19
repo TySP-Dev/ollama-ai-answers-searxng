@@ -1,4 +1,4 @@
-import json, os, logging, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
+import json, os, logging, base64, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
 from collections import Counter
 from urllib.parse import urlparse
 try:
