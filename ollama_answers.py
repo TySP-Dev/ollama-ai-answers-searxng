@@ -877,17 +877,27 @@ FRONTEND_JS_TEMPLATE = r"""
     const box = document.getElementById('sxng-stream-box');
     const data = document.getElementById('sxng-stream-data');
 
-    // Hide native SearXNG answer entries that are siblings of our box
     setTimeout(() => {
-        const parent = box ? box.parentElement : null;
-        if (parent) {
-            Array.from(parent.children).forEach(el => {
-                if (el !== box && el.classList.contains('answer')) {
-                    el.style.display = 'none';
-                }
-            });
+        const ourWrapper = box ? box.closest('.answer') : null;
+        const answersDiv = document.getElementById('answers');
+        if (!ourWrapper || !answersDiv) return;
+
+        let hasVisibleAbove = false;
+        let found = false;
+        Array.from(answersDiv.children).forEach(el => {
+            if (el === ourWrapper) { found = true; return; }
+            if (!found && el.classList.contains('answer')) {
+                // This is a native answer sibling above us
+                hasVisibleAbove = true;
+            }
+        });
+
+        if (hasVisibleAbove) {
+            box.style.borderTop = '1px solid var(--color-result-border, #4c566a)';
+            box.style.paddingTop = '1rem';
+            box.style.marginTop = '0.75rem';
         }
-    }, 0);
+    }, 50);
 
     let restored = false;
     let isStreaming = false;
@@ -2040,7 +2050,7 @@ class SXNGPlugin(Plugin):
                 .replace("__JS_Q__", js_q)
 
             html_payload = f'''
-                <article id="sxng-stream-box" class="answer" style="display:none; margin-top: 1rem; margin-bottom: 0; border-top: 1px solid var(--color-result-border, #4c566a); padding-top: 1rem;">
+                <article id="sxng-stream-box" class="answer" style="display:none; margin-top: 0; margin-bottom: 0;">
                     <style>
                         @keyframes sxng-fade-pulse {{
                             0%, 100% {{ opacity: 0.1; }}
