@@ -344,7 +344,7 @@ INTERACTIVE_CSS = '''
                             appearance: none;
                             -webkit-appearance: none;
                             background: url("data:image/svg+xml;charset=UTF-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%0A%3Cg%20fill%3D%22%23aaa%22%3E%0A%3Cpolygon%20points%3D%22128%2C192%20256%2C320%20384%2C192%22%2F%3E%3C%2Fg%3E%0A%3C%2Fsvg%3E") calc(100% + 2rem) / 1rem no-repeat content-box border-box;
-                            background-color: #424247;
+                            background-color: var(--color-toolkit-select-background, #424247);
                             text-overflow: ellipsis;
                             border-width: 0 2rem 0 0;
                             border-color: transparent;
@@ -361,7 +361,7 @@ INTERACTIVE_CSS = '''
                             vertical-align: middle;
                         }
                         .sxng-model-select:hover {
-                            background-color: #303033;
+                            background-color: var(--color-result-hover, #303033);
                             color: var(--color-search-url, #bbb);
                         }
                         .sxng-reasoning {
@@ -600,23 +600,6 @@ INTERACTIVE_JS = r'''
                                 _ms.appendChild(_o);
                             }
                         }
-                        if (window.getComputedStyle && box) {
-                            try {
-                                const docStyles = getComputedStyle(document.documentElement);
-                                let accent = docStyles.getPropertyValue('--color-result-link').trim();
-                                if (!accent) {
-                                    const a = document.createElement('a');
-                                    document.body.appendChild(a);
-                                    accent = getComputedStyle(a).color;
-                                    document.body.removeChild(a);
-                                }
-                                if (accent) {
-                                    box.style.setProperty('--color-result-link', accent);
-                                    box.style.setProperty('--sxng-ai-accent', accent);
-                                }
-                            } catch(e) {}
-                        }
-
                         // conversation saved as base64 URL fragment.
                         const updateState = () => {
                             try {
@@ -876,6 +859,41 @@ FRONTEND_JS_TEMPLATE = r"""
     };
     const box = document.getElementById('sxng-stream-box');
     const data = document.getElementById('sxng-stream-data');
+
+    (function applyTheme() {
+        try {
+            const root = document.documentElement;
+            const s = getComputedStyle(root);
+            const get = (v, fallback) => s.getPropertyValue(v).trim() || fallback;
+
+            const theme = {
+                '--color-answer-background': get('--color-answer-background', '#313338'),
+                '--color-answer-font':       get('--color-answer-font', '#fff'),
+                '--color-result-link':       get('--color-result-link', '#8aacf7'),
+                '--color-base-font':         get('--color-base-font', '#cdd6f4'),
+                '--color-sidebar-bg':        get('--color-sidebar-bg', '#424247'),
+                '--color-result-hover':      get('--color-result-hover', '#303033'),
+                '--color-base-background':   get('--color-base-background', '#2a2a2e'),
+                '--color-search-font':       get('--color-search-font', '#bbb'),
+                '--color-result-border':     get('--color-result-border', '#4c566a'),
+                '--color-result-description':get('--color-result-description', '#d8dee9'),
+                '--color-toolkit-select-background': get('--color-toolkit-select-background', '#313338'),
+            };
+
+            // Apply to box and any ai-answers container
+            const targets = [box, document.getElementById('ai-answers')].filter(Boolean);
+            targets.forEach(el => {
+                Object.entries(theme).forEach(([k, v]) => {
+                    if (v) el.style.setProperty(k, v);
+                });
+            });
+
+            // Also apply to document root so our CSS vars cascade
+            Object.entries(theme).forEach(([k, v]) => {
+                if (v) box.style.setProperty(k, v);
+            });
+        } catch(e) {}
+    })();
 
     // Move AI Overview outside #answers, place it before #results
     (function relocateBox() {
@@ -2112,7 +2130,7 @@ class SXNGPlugin(Plugin):
                     </style>
                     <div class="sxng-ai-header">
                         <span class="sxng-ai-label">
-                            <span style="color:#4a9eff;font-size:1.1em;">✦</span> AI Overview
+                            <span style="color:var(--color-result-link, #4a9eff);font-size:1.1em;">✦</span> AI Overview
                         </span>
                         <select id="sxng-model-select" class="sxng-model-select" title="Select model"></select>
                     </div>
