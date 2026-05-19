@@ -877,27 +877,33 @@ FRONTEND_JS_TEMPLATE = r"""
     const box = document.getElementById('sxng-stream-box');
     const data = document.getElementById('sxng-stream-data');
 
-    setTimeout(() => {
-        const ourWrapper = box ? box.closest('.answer') : null;
+    // Move AI Overview outside #answers, place it before #results
+    (function relocateBox() {
         const answersDiv = document.getElementById('answers');
-        if (!ourWrapper || !answersDiv) return;
+        const resultsDiv = document.getElementById('results') ||
+                           document.querySelector('.results') ||
+                           document.querySelector('#urls');
 
-        let hasVisibleAbove = false;
-        let found = false;
-        Array.from(answersDiv.children).forEach(el => {
-            if (el === ourWrapper) { found = true; return; }
-            if (!found && el.classList.contains('answer')) {
-                // This is a native answer sibling above us
-                hasVisibleAbove = true;
-            }
-        });
+        if (!box || !answersDiv) return;
 
-        if (hasVisibleAbove) {
-            box.style.borderTop = '1px solid var(--color-result-border, #4c566a)';
-            box.style.paddingTop = '1rem';
-            box.style.marginTop = '0.75rem';
+        // Create our own container
+        const aiContainer = document.createElement('div');
+        aiContainer.id = 'ai-answers';
+        aiContainer.style.cssText = 'margin-bottom: 1rem;';
+
+        // Move our box into the new container
+        aiContainer.appendChild(box);
+
+        // Insert before results, or before #answers if no results found
+        if (resultsDiv) {
+            resultsDiv.parentNode.insertBefore(aiContainer, resultsDiv);
+        } else {
+            answersDiv.parentNode.insertBefore(aiContainer, answersDiv);
         }
-    }, 50);
+
+        // Hide #answers entirely since our box is now elsewhere
+        answersDiv.style.display = 'none';
+    })();
 
     let restored = false;
     let isStreaming = false;
