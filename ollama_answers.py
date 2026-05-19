@@ -296,6 +296,8 @@ INTERACTIVE_CSS = '''
                             align-items: center;
                             margin: 0 0.5rem;
                             position: relative;
+                            overflow: hidden;
+                            border-radius: 4px;
                         }
                         .sxng-input {
                             width: 100%;
@@ -339,11 +341,6 @@ INTERACTIVE_CSS = '''
                             opacity: 1;
                             color: var(--color-result-link, #5e81ac);
                             background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
-                        }
-                        .sxng-input-wrapper {
-                            position: relative;
-                            overflow: hidden;
-                            border-radius: 4px;
                         }
                         .sxng-input-wrapper::before {
                             content: "";
