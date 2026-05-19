@@ -296,57 +296,32 @@ INTERACTIVE_CSS = '''
                             align-items: center;
                             margin: 0 0.5rem;
                             position: relative;
-                            border-radius: 4px;
-                            overflow: hidden;
-                            padding: 1px;
-                            background: var(--color-result-border, rgba(0,0,0,0.15));
-                        }
-                        .sxng-input-wrapper::before {
-                            content: "";
-                            position: absolute;
-                            width: 200%;
-                            height: 200%;
-                            top: -50%;
-                            left: -50%;
-                            background: conic-gradient(
-                                transparent 0deg,
-                                transparent 270deg,
-                                var(--color-result-link, #4a9eff) 300deg,
-                                transparent 360deg
-                            );
-                            opacity: 0;
-                            transition: opacity 0.3s ease;
-                            animation: sxng-border-rotate 2s linear infinite;
-                            animation-play-state: paused;
-                        }
-                        .sxng-input-wrapper:focus-within {
-                            background: transparent;
-                        }
-                        .sxng-input-wrapper:focus-within::before {
-                            opacity: 1;
-                            animation-play-state: running;
-                        }
-                        @keyframes sxng-border-rotate {
-                            from { transform: rotate(0deg); }
-                            to { transform: rotate(360deg); }
                         }
                         .sxng-input {
-                            position: relative;
-                            z-index: 1;
                             width: 100%;
-                            height: 100%;
-                            background: var(--color-base-background, #1e1e2e);
-                            border: none;
+                            height: -webkit-fill-available;
+                            background: var(--color-base-background-hover, rgba(0,0,0,0.06));
+                            border: 1px solid var(--color-result-border, rgba(0,0,0,0.15));
                             color: var(--color-base-font, inherit);
                             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                             font-size: 0.78em;
                             padding: 3px 8px;
-                            border-radius: 3px;
+                            border-radius: 4px;
                             line-height: 1.4;
                             vertical-align: middle;
                         }
                         .sxng-input:focus { outline: none; }
                         .sxng-input::placeholder { color: var(--color-base-font, inherit); opacity: 0.4; }
+                        .sxng-input-line {
+                            position: absolute;
+                            bottom: 0;
+                            left: 0;
+                            width: 0;
+                            height: 1px;
+                            background: var(--color-result-link, #5e81ac);
+                            transition: width 0.3s ease;
+                        }
+                        .sxng-input:focus + .sxng-input-line { width: 100%; }
                         .sxng-user-msg {
                             display: block;
                             width: fit-content;
@@ -359,6 +334,11 @@ INTERACTIVE_CSS = '''
                             line-height: 1.4;
                             opacity: 0.55;
                             animation: sxng-fade-in-up 0.3s ease-out forwards;
+                        }
+                        .sxng-input-wrapper:focus-within {
+                            opacity: 1;
+                            color: var(--color-result-link, #5e81ac);
+                            background: var(--color-base-background-hover, rgba(0,0,0,0.05)) !important;
                         }
                         .sxng-model-select {
                             appearance: none;
