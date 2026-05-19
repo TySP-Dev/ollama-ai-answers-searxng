@@ -907,8 +907,19 @@ FRONTEND_JS_TEMPLATE = r"""
         aiContainer.id = 'ai-answers';
         const rootStyle = getComputedStyle(document.documentElement);
         const getVar = (v, fb) => rootStyle.getPropertyValue(v).trim() || fb;
+        const bg = getVar('--color-answer-background', '');
+        const answerFont = getVar('--color-answer-font', '');
+        // Detect light mode by checking if answer font is dark
+        const isLight = answerFont && (answerFont.includes('0,0,0') ||
+            answerFont.includes('#000') || answerFont.includes('#333') ||
+            answerFont.includes('#444') || answerFont.includes('rgb(0') ||
+            answerFont.includes('rgb(3') || answerFont.includes('rgb(4') ||
+            answerFont.includes('rgb(5') || answerFont.includes('rgb(6'));
+        const containerBg = isLight
+            ? 'rgba(0,0,0,0.06)'
+            : (bg || 'var(--color-answer-background, #313338)');
         aiContainer.style.cssText = [
-            `background: ${getVar('--color-answer-background', 'var(--color-answer-background, #313338)')}`,
+            `background: ${containerBg}`,
             'padding: 1rem',
             'margin: 0 0 1rem 0',
             `color: ${getVar('--color-answer-font', 'var(--color-answer-font, #fff)')}`,
