@@ -1,12 +1,11 @@
-import json, os, logging, base64, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
+import json, os, logging, time, hashlib, re, http.client, ssl, concurrent.futures, threading, math
 from collections import Counter
 from urllib.parse import urlparse
-from searx import network
 try:
     from searx.network import get_network
 except ImportError:
     get_network = None
-from flask import Response, request, abort, jsonify
+from flask import request, abort, jsonify
 from searx.plugins import Plugin, PluginInfo
 from searx.result_types import EngineResults
 from searx import settings
@@ -24,7 +23,6 @@ except ImportError:
     logger.warning("AI Answers: valkey package not found. Streaming via Valkey unavailable.")
 
 TOKEN_EXPIRY_SEC = 3600
-STREAM_CHUNK_SIZE = 512
 STREAM_TIMEOUT_SEC = 60
 CONV_TTL = 1800
 
@@ -670,7 +668,6 @@ INTERACTIVE_JS = r'''
                                         }
                                     });
                                     box.style.display = 'block';
-                                    if(wrapper) wrapper.style.display = '';
                                     if(footer && is_interactive) footer.style.display = 'flex';
                                     restored = true;
                                 }
@@ -855,7 +852,6 @@ FRONTEND_JS_TEMPLATE = r"""
     const conversation = {
         originalQuery: q_init,
         originalContext: new TextDecoder().decode(Uint8Array.from(atob(b64_init), c => c.charCodeAt(0))),
-        originalSources: [...urls],
         turns: [{role: 'user', content: q_init, ts: Date.now()}]
     };
     const box = document.getElementById('sxng-stream-box');
@@ -889,10 +885,6 @@ FRONTEND_JS_TEMPLATE = r"""
                 });
             });
 
-            // Also apply to document root so our CSS vars cascade
-            Object.entries(theme).forEach(([k, v]) => {
-                if (v) box.style.setProperty(k, v);
-            });
         } catch(e) {}
     })();
 
