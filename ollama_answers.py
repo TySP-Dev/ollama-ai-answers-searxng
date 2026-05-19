@@ -888,6 +888,24 @@ FRONTEND_JS_TEMPLATE = r"""
             });
         }
     }, 0);
+
+    setTimeout(() => {
+        const parent = box ? box.parentElement : null;
+        if (parent) {
+            // Check if any sibling answers are visible above us
+            const siblings = Array.from(parent.children);
+            const ourIndex = siblings.indexOf(box);
+            const hasVisibleSiblingAbove = siblings.slice(0, ourIndex).some(
+                el => el !== box && el.style.display !== 'none'
+            );
+            if (hasVisibleSiblingAbove) {
+                box.style.borderTop = '1px solid var(--color-result-border, #444)';
+                box.style.paddingTop = '1rem';
+                box.style.marginTop = '0.75rem';
+            }
+        }
+    }, 10);
+
     let restored = false;
     let isStreaming = false;
     
