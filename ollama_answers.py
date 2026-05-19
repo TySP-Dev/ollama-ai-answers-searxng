@@ -298,6 +298,7 @@ INTERACTIVE_CSS = '''
                             position: relative;
                             overflow: hidden;
                             border-radius: 4px;
+                            background: var(--color-result-border, rgba(0,0,0,0.15));
                         }
                         .sxng-input {
                             width: 100%;
@@ -345,24 +346,24 @@ INTERACTIVE_CSS = '''
                         .sxng-input-wrapper::before {
                             content: "";
                             display: block;
-                            background: linear-gradient(
-                                90deg,
-                                var(--color-result-link, #4a9eff) 0%,
-                                hsla(210, 100%, 80%, 0.6) 50%,
-                                var(--color-result-link, #4a9eff) 100%
+                            background: conic-gradient(
+                                from 0deg,
+                                transparent 0deg,
+                                var(--color-result-link, #4a9eff) 60deg,
+                                transparent 120deg
                             );
-                            height: 200px;
-                            width: 200px;
+                            height: 300px;
+                            width: 300px;
                             position: absolute;
-                            animation: sxng-border-rotate 4s linear infinite;
+                            animation: sxng-border-rotate 3s linear infinite;
                             z-index: 0;
                             opacity: 0;
-                            transition: opacity 0.3s ease;
+                            transition: opacity 0.4s ease;
                             top: 50%;
                             left: 50%;
+                            margin-top: -150px;
+                            margin-left: -150px;
                             transform-origin: center center;
-                            margin-top: -100px;
-                            margin-left: -100px;
                         }
                         .sxng-input-wrapper:focus-within::before {
                             opacity: 1;
@@ -376,7 +377,10 @@ INTERACTIVE_CSS = '''
                             z-index: 1;
                             margin: 1px;
                             width: calc(100% - 2px);
+                            height: calc(100% - 2px);
                             border-radius: 3px;
+                            background: var(--color-base-background-hover, rgba(0,0,0,0.06));
+                            border: none;
                         }
                         .sxng-model-select {
                             appearance: none;
