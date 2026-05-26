@@ -1,9 +1,9 @@
 <div align="center">
 
-[![Main Repo](https://img.shields.io/badge/Main%20Repo-gits.tysstech.com-blue?logo=gitea)](https://git.tysstech.com/TySS-Dev/ollama-ai-answers-searxng)
+[![Main Repo](https://img.shields.io/badge/Main%20Repo-git.tysstech.com-blue?logo=gitea)](https://git.tysstech.com/TySS-Dev/ollama-ai-answers-searxng)
 [![Mirror Repo](https://img.shields.io/badge/Mirror%20Repo-github.com-blue?logo=github)](https://github.com/TySP-Dev/ollama-ai-answers-searxng)
 
-<div align="left">
+</div>
 
 # Ollama AI Answers Plugin for SearXNG
 **Based on [ai-answers-searxng](https://github.com/cra88y/ai-answers-searxng) by [cra88y](https://github.com/cra88y)**
